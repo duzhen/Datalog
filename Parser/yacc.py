@@ -120,9 +120,11 @@ def p_constraintconstant(p):
     #  p[0] = Tree(p[1], p[-1], 'query')
 
 def p_error(p):
+    out.write("Syntax error in input! " + str(p) + "\n")
     print("Syntax error in input! ", p)
 
 parser = yacc.yacc(start='program', write_tables=False, debug=False)
+out = open('p.res', 'w')
 
 if __name__ == '__main__':
     parser = yacc.yacc(start='program')
