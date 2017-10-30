@@ -1,0 +1,17 @@
+bin
+*.log
+target
+classes
+*.bak
+build
+.settings
+gen
+Debug
+#.classpath
+#.project
+.DS_Store
+.idea/
+out/
+/Release/
+*.txt
+*.pyc
