@@ -333,7 +333,7 @@ def filterDicByNewTermDic(dict, dictNew):
 def matchHeader(rule, binding, facts):
     # variable = bindingToVariable(binding)
     # print("new variable", variable)
-    header = rule.header
+    header = rule.head
     first = True
     dict = []
     for term in header.terms:
