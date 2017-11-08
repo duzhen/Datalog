@@ -15,6 +15,8 @@ def main(argv):
     parser = Parser.yacc.parser
     file = open(argv[1], 'r')
     program = parser.parse(file.read())
+    if not program:
+        return
     for p in program:
         if p.type == 'fact':
             print(p)
@@ -58,6 +60,33 @@ def main(argv):
     print("finally, get facts ", len(facts))
     for f in facts:
         print(f)
+
+    print('\n', query)
+    queryFromFacts(query, facts)
+
+def queryFromFacts(query, facts):
+    print("ANSWER:")
+    for q in query:
+        answer = []
+        for p in q.query:
+            if p.type == 'predicate':
+                newFacts = getFactsByPredicate(facts, p.predicate, len(p.terms))
+                if isLowerCaseList(p.terms):
+                    r = False
+                    for f in newFacts:
+                        if f.fact.terms == p.terms:
+                            r = p.isNegated == f.fact.isNegated
+                    answer.append(r)
+                else:
+                    for f in newFacts.copy():
+                        for i in range(0, len(p.terms)):
+                            if isLowerCase(p.terms[i]):
+                                if not f.fact.terms[i] == p.terms[i]:
+                                    newFacts.remove(f)
+                    answer.append([tuple(x.fact.terms) for x in newFacts])
+        print(answer)
+
+
 
 def naiveEngine(dependsList, facts, rules):
     for depend in dependsList:
@@ -274,7 +303,7 @@ def unifyBinding(p1, p2, binding):
         for i in range(0, len(p1.terms)-1):
             print(p1.terms[i])
             print(p2.terms[i])
-        if isUpperCase(p2.terms):
+        if isUpperCaseList(p2.terms):
             variable = {}
             if p2.predicate in binding.keys():
                 variable = binding[p2.predicate]
@@ -288,16 +317,30 @@ def unifyBinding(p1, p2, binding):
             binding[p2.predicate] = variable
             print("binding is:", binding)
 
-def isUpperCase(list):
+def isUpperCaseList(list):
     for i in list:
         if not i.istitle():
             return False
     return True
 
-#get the relative facts
-def getFactsByPredicate(facts, name):
-    return [x for x in facts if x is not None and x.fact.predicate == name]
+def isLowerCaseList(list):
+    for i in list:
+        if i.istitle():
+            return False
+    return True
 
+def isUpperCase(c):
+    return c.istitle()
+
+def isLowerCase(c):
+    return not c.istitle()
+
+#get the relative facts
+def getFactsByPredicate(facts, name, termLength=None):
+    if termLength:
+        return [x for x in facts if x is not None and x.fact.predicate == name and len(x.fact.terms) == termLength]
+    else:
+        return [x for x in facts if x is not None and x.fact.predicate == name]
     Parser.yacc.out.close()
 if __name__ == '__main__':
     if len(sys.argv) != 2:
