@@ -3,13 +3,13 @@ edge(a, c).
 edge(b, d).
 edge(c, d).
 edge(d, e).
-not edge(f, e).
+#not edge(f, e).
 
-path(X, Y) :- edge(X, Y).
+path(X, Y) :- edge(X, Y), X==Y.
 path(X, Y) :- path(X, Z), path(Z, Y).
 #path(X, X) :- not edge(X, X).
 
-path(a, b)?
-path(f, X), V == e ?
-path(a, X), path(X, d)?
+path(a, e)?
+#path(f, X), V == e ?
+#path(a, X), path(X, d)?
 #edge(f, e).

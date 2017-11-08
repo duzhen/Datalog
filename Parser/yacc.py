@@ -105,7 +105,8 @@ def p_atomvariable(p):
 
 def p_atomconstant(p):
     '''atom : CONSTANT'''
-    p[0] = "\'" + p[1] + "\'"
+    p[0] = p[1]
+    # p[0] = "\'" + p[1] + "\'"
 
 def p_constraintvariable(p):
     '''constraint : VARIABLE OPERATOR VARIABLE'''
@@ -113,7 +114,8 @@ def p_constraintvariable(p):
 
 def p_constraintconstant(p):
     '''constraint : VARIABLE OPERATOR CONSTANT'''
-    p[0] = Constraint(p[1], p[2], "\'" + p[3] + "\'")
+    p[0] = Constraint(p[1], p[2], p[3])
+    # p[0] = Constraint(p[1], p[2], "\'" + p[3] + "\'")
 
     # def p_recursion(p):
     #  '''query : block recursive_query DOT'''

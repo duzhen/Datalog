@@ -16,24 +16,46 @@ class Query(object):
 class Fact(object):
     def __init__(self, fact, type = "fact"):
         self.fact = fact
+        self.fact.type = type
         self.type = type
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__dict__ == other.__dict__
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __repr__(self):
         return "%r" % (self.__dict__)
 
 class Predicate(object):
-    def __init__(self, name="", terms=[], isNegated=""):
+    def __init__(self, name="", terms=[], isNegated="", type = "predicate"):
         self.predicate = name
         self.terms = terms
         self.isNegated = isNegated
+        self.type = type
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__dict__ == other.__dict__
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __repr__(self):
         return "%r" % (self.__dict__)
    
    
 class Constraint(object):
-    def __init__(self, termX="", operator="", termY=""):
+    def __init__(self, termX="", operator="", termY="", type = "constraint"):
         self.termX = termX
         self.operator = operator
-        self.termY = termY 
+        self.termY = termY
+        self.type = type
     def __repr__(self):
         return "%r" % (self.__dict__)
