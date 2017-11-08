@@ -65,7 +65,7 @@ def main(argv):
     print('\nTopological sort:', dependsList)
     #Naive part
     #for each node in topological sort, implement of Extend dependency graph
-    naiveEngine(dependsList, facts, rules)
+    engine(dependsList, facts, rules)
     print("finally, get facts ", len(facts))
     for f in facts:
         print(f)
@@ -95,10 +95,15 @@ def queryFromFacts(query, facts):
                     answer.append([tuple(x.fact.terms) for x in newFacts])
         print(answer)
 
+def buildRelativeRule(rules):
+    return
 
+def getRuleByNewFact():
+    return
 
-def naiveEngine(dependsList, facts, rules):
+def engine(dependsList, facts, rules):
     for depend in dependsList:
+        semiRules = buildRelativeRule(rules)
         while True:
             newFacts = []
             for rule in rules:
@@ -109,14 +114,17 @@ def naiveEngine(dependsList, facts, rules):
                     print("new fact", newFacts)
                     if not len(newFacts) == 0:
                         break
+                    else:
+                        #semi-naive part
+                        rules = rules#getRuleByNewFact(newFacts, semiRules)
             if len(newFacts) == 0:
                 break
+            for f in newFacts:
+                Parser.yacc.out.write("\n*{}\n".format(f))
             facts.extend(newFacts)
             # print(facts)
 
-            # match all the goals in the rule
-
-
+# match all the goals in the rule
 def matchGoals(facts, rule):
     binding = {}
     #for each goal in body
@@ -135,7 +143,7 @@ def matchGoals(facts, rule):
                 if not unifyBinding(b_fact.fact, body, binding, facts):
                     return
     globalIntersection(binding, rule.body)
-    return matchHeader(rule.head, binding, facts)
+    return matchHeader(rule, binding, facts)
 
 # ('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
 # above is value
@@ -292,7 +300,7 @@ def getDicFromTuplesByTerm(binding, term):
 
 def checkIfDicSetValid(dict):
     for key, value in dict.items():
-        print("check valid value", value)
+        # print("check valid value", value)
         if not len(value) == 1:
             return False
     return True
@@ -316,15 +324,16 @@ def filterDicByNewTermDic(dict, dictNew):
     list = filterList.copy()
     for f in list:
         if not checkIfDicSetValid(f):
-            print("remove dit", f)
+            # print("remove dit", f)
             filterList.remove(f)
     dict.clear()
     dict.extend(filterList)
 
 #generate new facts from header
-def matchHeader(header, binding, facts):
+def matchHeader(rule, binding, facts):
     # variable = bindingToVariable(binding)
     # print("new variable", variable)
+    header = rule.header
     first = True
     dict = []
     for term in header.terms:
@@ -334,6 +343,7 @@ def matchHeader(header, binding, facts):
         # else:
         dictNew = getDicFromTuplesByTerm(binding, term)
         filterDicByNewTermDic(dict, dictNew)
+        #[{'X': {'a'}, 'Z': {'b'}, 'Y': {'d'}}, {'X': {'a'}, 'Z': {'b'}, 'Y': {'a'}}]
 
     print("after filter dict", dict)
 
@@ -341,14 +351,15 @@ def matchHeader(header, binding, facts):
     newFacts = []
     for d in dict:
         for t in header.terms:
-            if not t in d:
+            if not t in d: # free variable in header
                 return newFacts
-        term = [list(d[x])[0] for x in header.terms]
-        print("get terms", term)
-        fact = Fact(Predicate(header.predicate, term, header.isNegated))
-        if not (checkFactExist(facts, fact) or checkFactExist(newFacts, fact)):
-            print("get new fact", fact)
-            newFacts.append(fact)
+        if satisfyBuildInPredicate(d, rule.body):
+            term = [list(d[x])[0] for x in header.terms]
+            # print("get terms", term)
+            fact = Fact(Predicate(header.predicate, term, header.isNegated))
+            if not (checkFactExist(facts, fact) or checkFactExist(newFacts, fact)):
+                print("get new fact", fact)
+                newFacts.append(fact)
         # possible = getVariablePossibleValue(variable, term)
         # print("possible value for", term, possible)
         # for p in possible:
@@ -356,6 +367,9 @@ def matchHeader(header, binding, facts):
         #     print("variable tuple is", tuple)
 
     return newFacts
+
+def satisfyBuildInPredicate(dict, body):
+    return True
 
 def checkFactExist(facts, fact):
     return fact in facts
