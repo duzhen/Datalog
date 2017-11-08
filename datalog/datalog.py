@@ -25,7 +25,16 @@ def main(argv):
             rules.append(p)
         elif p.type == 'query':
             query.append(p)
-
+    for fact in facts.copy():
+        if not isLowerCaseList(fact.fact.terms):
+            facts.remove(fact)
+            Parser.yacc.out.write("\nBad value in Fact\n" + str(fact))
+    for q in query.copy():
+        for p in q.query:
+            if p.type == 'predicate':
+                if p.isNegated and not isLowerCaseList(p.terms):
+                    query.remove(q)
+                    Parser.yacc.out.write("\nBad negation query\n" + str(q))
     print(facts)
     print('\n', rules)
     print('\n', query)
@@ -123,7 +132,9 @@ def matchGoals(facts, rule):
             b_facts = getFactsByPredicate(facts, body.predicate)
             # print(b_facts)
             for b_fact in b_facts:
-                unifyBinding(b_fact.fact, body, binding)
+                if not unifyBinding(b_fact.fact, body, binding, facts):
+                    return
+    globalIntersection(binding, rule.body)
     return matchHeader(rule.head, binding, facts)
 
 # ('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
@@ -148,17 +159,38 @@ def filterBinding(binding, variable):
 #make a tuple match to a new match, like
 #('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
 # to {'X': {'c', 'a', 'd', 'b'}, 'Y': {'c', 'd', 'b', 'e'}}
-def globalIntersection(binding):
-    variable = bindingToVariable(binding)
+def globalIntersection(binding, body):
+    variable = bindingToVariable(binding, body)
     filterBinding(binding, variable)
     print("new matching variable is:", variable)
 
-def bindingToVariable(binding):
+def checkBodyNegative(predicate, key, body):
+    print("check negative", predicate, key)
+    for b in body:
+        if b.type == 'predicate' and b.predicate == predicate and b.terms == list(key):
+            return b.isNegated
+    return False
+
+def bindingToVariable(binding, body):
     variable = {}
     print(binding.values())
-    for value in binding.values():
-        for key in value.keys():
-            for i in range(0, len(key)):
+    negativeValue = []
+    # for bindingKey, value in binding.items():
+    #     for key, keyValue in value.items():
+    #         # check if edge(X, Y) in body is negative, we cannot have edge(X, Y), not edge(X, Y)
+    #         if checkBodyNegative(bindingKey, key, body):
+    #             # negativeValue.extend(keyValue)
+    #             print(keyValue, value)
+    #             if keyValue in value:
+    #                 value = value - keyValue
+
+    # for bindingKey, value in binding.items():
+    #     for key, keyValue in value.items():
+    print("after process negative", binding)
+    for bindingKey, value in binding.items():
+        for key, keyValue in value.items():
+            localVariable = {}
+            for i in range(0, len(key)): #(X, X)
                 listNew = []
                 for v in value[key]:
                     listNew.append(v[i])
@@ -166,8 +198,39 @@ def bindingToVariable(binding):
                 list = listNew
                 if key[i] in variable.keys():
                     list = variable[key[i]]
+                # if not key[i] in localVariable.keys():
+                #     localVariable[key[i]] = []
+                # localVariable[key[i]].append(listNew)
+                # if i == len(key) - 1:
+                #     for localV in localVariable.values():
+                #         localVCopy = localV.copy()
+                #         if len(localV) > 1:
+                #             firstV = localV[0].copy()
+                #             for index in range(0, len(firstV)):
+                #                 for k in range(0, len(localV)):
+                #                     if not localVCopy[k][index] == firstV[index]:
+                #                         for l in range(0, len(localV)):
+                #                             if localVCopy[l][index] in localV[l]:
+                #                                 localV[l].remove(localVCopy[l][index])
+                #
+                # print(localVariable)
 
+
+                # if key[i] in variable.keys(): # value already exist
+                #     if key[i] in localVariable.keys():
+                #         copyListNew = listNew.copy()
+                #         for j in range(0, len(copyListNew)): # local intersection
+                #             print(listNew, localVariable[key[i]])
+                #             if not copyListNew[j] == localVariable[key[i]][j]:
+                #                 listNew.remove(copyListNew[j])
+                # if not key[i] in localVariable.keys():
+                #     localVariable[key[i]] = listNew
+                # check if edge(X, Y) in body is negative, we cannot have edge(X, Y), not edge(X, Y)
                 variable[key[i]] = set(listNew).intersection(list)
+            # if checkBodyNegative(bindingKey, key, body):
+            #     localBinding = {bindingKey: value}
+            #     filterBinding(localBinding, localVariable)
+
     return variable
 
 @deprecated('duplicated implement')
@@ -260,9 +323,8 @@ def filterDicByNewTermDic(dict, dictNew):
 
 #generate new facts from header
 def matchHeader(header, binding, facts):
-    globalIntersection(binding)
-    variable = bindingToVariable(binding)
-    print("new variable", variable)
+    # variable = bindingToVariable(binding)
+    # print("new variable", variable)
     first = True
     dict = []
     for term in header.terms:
@@ -278,6 +340,9 @@ def matchHeader(header, binding, facts):
     #now we get all the accept value for header
     newFacts = []
     for d in dict:
+        for t in header.terms:
+            if not t in d:
+                return newFacts
         term = [list(d[x])[0] for x in header.terms]
         print("get terms", term)
         fact = Fact(Predicate(header.predicate, term, header.isNegated))
@@ -296,13 +361,13 @@ def checkFactExist(facts, fact):
     return fact in facts
 
 #get variable tuple for each goal
-def unifyBinding(p1, p2, binding):
+def unifyBinding(p1, p2, binding, facts):
     if len(p1.terms) == len(p2.terms):
         # keys = (x for x in p1.terms)
         # print(keys)
-        for i in range(0, len(p1.terms)-1):
-            print(p1.terms[i])
-            print(p2.terms[i])
+        # for i in range(0, len(p1.terms)-1):
+        #     print(p1.terms[i])
+        #     print(p2.terms[i])
         if isUpperCaseList(p2.terms):
             variable = {}
             if p2.predicate in binding.keys():
@@ -316,7 +381,10 @@ def unifyBinding(p1, p2, binding):
             variable[tuple(p2.terms)] = value
             binding[p2.predicate] = variable
             print("binding is:", binding)
+        elif isLowerCaseList(p2.terms):
+            return p2.terms in [x.terms for x in facts]
 
+    return True
 def isUpperCaseList(list):
     for i in list:
         if not i.istitle():
@@ -341,9 +409,10 @@ def getFactsByPredicate(facts, name, termLength=None):
         return [x for x in facts if x is not None and x.fact.predicate == name and len(x.fact.terms) == termLength]
     else:
         return [x for x in facts if x is not None and x.fact.predicate == name]
-    Parser.yacc.out.close()
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print('Usage: python datalog.py datalog.cdl')
         sys.exit(-1)
     main(sys.argv)
+    Parser.yacc.out.close()
