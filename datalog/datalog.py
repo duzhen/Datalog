@@ -101,7 +101,8 @@ def main(argv):
     for r in rules:
         parserLog(str(r) + "\n")
         for body in r.body:
-            if body.type == 'predicate' and not body.predicate == r.head.predicate:
+            if body.type == 'predicate' and not body.predicate == r.head.predicate \
+                    and not G.has_edge(r.head.predicate, body.predicate):
                 G.add_edge(body.predicate, r.head.predicate)
 
     parserLog("\nQUERY:\n")
@@ -191,7 +192,7 @@ def engine(dependsList, facts, rules):
             if False:#semi-naive
                 # semi-naive part
                 rules = getRuleByNewFact(facts)
-    log.trace("Get {} new facts, achieved least fix-point!".format(len(newFacts)))
+    log.trace("Get {} new facts, achieved least fix-point!".format(len(facts)))
 
 # match all the goals in the rule
 def matchGoals(facts, rule):
@@ -205,7 +206,7 @@ def matchGoals(facts, rule):
         #     do some thing
         # else not negated
         if body.type == 'predicate':
-            log.trace("Start match predicate {}", body)
+            log.trace("Start match predicate {}".format(body))
             b_facts = getFactsByPredicate(facts, body.predicate)
             log.debug("in body {} get fact {}".format(body.predicate, b_facts))
             log.trace("Find {} facts with this predicate".format(len(b_facts)))
@@ -440,8 +441,8 @@ def matchHeader(rule, binding, facts, dict):
                 newFacts.append(fact)
         # possible = getVariablePossibleValue(variable, term)
         # print("possible value for", term, possible)
-        # for p in possible:
-        #     tuple = getVariableTuple(binding, term, p)
+        # for performance in possible:
+        #     tuple = getVariableTuple(binding, term, performance)
         #     print("variable tuple is", tuple)
 
     return newFacts
@@ -462,6 +463,7 @@ def unifyBinding(p1, p2, binding, facts):
         # for i in range(0, len(p1.terms)-1):
         #     print(p1.terms[i])
         #     print(p2.terms[i])
+        log.debug("fact is {}, body is {}".format(p1, p2))
         if isUpperCaseList(p2.terms):
             variable = {}
             if p2.predicate in binding.keys():
@@ -477,7 +479,7 @@ def unifyBinding(p1, p2, binding, facts):
             log.trace("Collect all the potential tuple values for {}".format(p2))
             log.debug("binding is {}".format(binding))
         elif isLowerCaseList(p2.terms):
-            exist = p2.terms in [x.terms for x in facts]
+            exist = p2.terms in [x.fact.terms for x in facts]
             log.trace("Body is a ground clause, value is {}".format(exist))
             return exist
 
