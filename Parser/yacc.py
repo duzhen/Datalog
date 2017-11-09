@@ -99,8 +99,7 @@ def p_atomlist2(p):
     p[0] = [p[1]]
 
 def p_atomvariable(p):
-    '''atom : VARIABLE
-        | UNDERSCORE'''
+    '''atom : VARIABLE'''
     p[0] = p[1]
 
 def p_atomconstant(p):

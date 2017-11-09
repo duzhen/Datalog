@@ -41,10 +41,10 @@ def main(argv):
 
     G = nx.DiGraph()
 
-    # Parser.yacc.out.write("FACT:\n")
-    # for f in fact:
-    #     Parser.yacc.out.write(str(f) + "\n")
-    #     G.add_node(f.fact)
+    Parser.yacc.out.write("\nFACT:\n")
+    for f in facts:
+        Parser.yacc.out.write(str(f) + "\n")
+        # G.add_node(f.fact)
 
     Parser.yacc.out.write("\nRULE:\n")
     for r in rules:
@@ -56,9 +56,6 @@ def main(argv):
     Parser.yacc.out.write("\nQUERY:\n")
     for q in query:
         Parser.yacc.out.write(str(q) + "\n")
-
-    # print('\n', G.nodes())
-    # print('\n', G.edges())
 
     depends = nx.topological_sort(G)
     dependsList = list(depends)
@@ -98,11 +95,20 @@ def queryFromFacts(query, facts):
 def buildRelativeRule(rules):
     return
 
-def getRuleByNewFact():
+def getRuleByNewFact(facts):
     return
 
 def engine(dependsList, facts, rules):
-    for depend in dependsList:
+    for i in range(0, len(dependsList)):
+        depend = dependsList[i]
+        # if not depend in [f.fact.predicate for f in facts]:
+        #     if i < len(dependsList)-1:
+        #         next = depend
+        #         depend = dependsList[i+1]
+        #         dependsList[i+1] = next
+        #     else:
+        #         continue
+    # for depend in dependsList:
         semiRules = buildRelativeRule(rules)
         while True:
             newFacts = []
@@ -112,16 +118,19 @@ def engine(dependsList, facts, rules):
                     print("in body, depend is", depend)
                     newFacts = matchGoals(facts, rule)
                     print("new fact", newFacts)
+                    if not newFacts:
+                        continue
                     if not len(newFacts) == 0:
                         break
-                    else:
-                        #semi-naive part
-                        rules = rules#getRuleByNewFact(newFacts, semiRules)
-            if len(newFacts) == 0:
+            if not newFacts or len(newFacts) == 0:
                 break
+            Parser.yacc.out.write("New facts:\n")
             for f in newFacts:
-                Parser.yacc.out.write("\n*{}\n".format(f))
+                Parser.yacc.out.write("*{}\n".format(f))
             facts.extend(newFacts)
+            if False:#semi-naive
+                # semi-naive part
+                rules = getRuleByNewFact(facts)
             # print(facts)
 
 # match all the goals in the rule
@@ -136,14 +145,17 @@ def matchGoals(facts, rule):
         #     do some thing
         # else not negated
         if body.type == 'predicate':
-            print("new facts length is", len(facts))
+            print("facts length is", len(facts))
             b_facts = getFactsByPredicate(facts, body.predicate)
-            # print(b_facts)
-            for b_fact in b_facts:
-                if not unifyBinding(b_fact.fact, body, binding, facts):
-                    return
-    globalIntersection(binding, rule.body)
-    return matchHeader(rule, binding, facts)
+            print("in body {} get fact {}".format(body.predicate, b_facts))
+            if len(b_facts) == 0:
+                return
+            else:
+                for b_fact in b_facts:
+                    if not unifyBinding(b_fact.fact, body, binding, facts):
+                        return
+    dict = globalIntersection(binding, rule.body)
+    return matchHeader(rule, binding, facts, dict)
 
 # ('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
 # above is value
@@ -154,15 +166,14 @@ def matchGoals(facts, rule):
 # for example (X, Y) = (1,2), (2,3), (Y,Z) = (2,4).
 # after intersection, Y = 2, 2 in X removed, then remove (2,3)
 def filterBinding(binding, variable):
-    for value in binding.values():
+    for value in binding.values(): # each predicate as key
         for key in value.keys(): #('X', 'Y')
-            for list in value[key].copy(): #['a', 'b']
-                for i in range(0, len(list)):
-                    print("check if value in new variable", list[i], variable[key[i]], list, value[key])
-                    if not list[i] in variable[key[i]]:
-                        if list in value[key]:
-                            value[key].remove(list)
-    print("new binding:", binding)
+            for l in value[key].copy(): #['a', 'b']
+                for i in range(0, len(l)):
+                    # print("check if value in new variable", list[i], variable[key[i]], list, value[key])
+                    if not l[i] in variable[key[i]]:
+                        if l in value[key]:
+                            value[key].remove(l)
 
 #make a tuple match to a new match, like
 #('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
@@ -171,6 +182,21 @@ def globalIntersection(binding, body):
     variable = bindingToVariable(binding, body)
     filterBinding(binding, variable)
     print("new matching variable is:", variable)
+
+    dict = []
+    # for term in ['X', 'Y']:
+    for value in binding.values():
+        for key, v in value.items():
+            # if first:
+            #     first = False
+            #     dict = getDicFromTuplesByTerm(binding, term)
+            # else:
+            dictNew = getDicFromTuplesByTerm(key, v)
+            filterDicByNewTermDic(dict, dictNew)
+            # [{'X': {'a'}, 'Z': {'b'}, 'Y': {'d'}}, {'X': {'a'}, 'Z': {'b'}, 'Y': {'a'}}]
+
+    print("after filter dict", dict)
+    return dict
 
 def checkBodyNegative(predicate, key, body):
     print("check negative", predicate, key)
@@ -181,7 +207,7 @@ def checkBodyNegative(predicate, key, body):
 
 def bindingToVariable(binding, body):
     variable = {}
-    print(binding.values())
+    # print(binding.values())
     negativeValue = []
     # for bindingKey, value in binding.items():
     #     for key, keyValue in value.items():
@@ -202,7 +228,7 @@ def bindingToVariable(binding, body):
                 listNew = []
                 for v in value[key]:
                     listNew.append(v[i])
-                    print(listNew)
+                    # print(listNew)
                 list = listNew
                 if key[i] in variable.keys():
                     list = variable[key[i]]
@@ -238,7 +264,7 @@ def bindingToVariable(binding, body):
             # if checkBodyNegative(bindingKey, key, body):
             #     localBinding = {bindingKey: value}
             #     filterBinding(localBinding, localVariable)
-
+    print("variable is", variable)
     return variable
 
 @deprecated('duplicated implement')
@@ -274,28 +300,24 @@ def getVariableTuple(binding, key, keyValue):
 
 # value of dict express by set
 def mergeTwoDict(dict1, dict2):
-    print("before update", dict1, dict2)
+    # print("before update", dict1, dict2)
     dict = dict1.copy()
     dict1.update(dict2)
-    print("previous dict and new dict1", dict, dict1)
+    # print("previous dict and new dict1", dict, dict1)
     for key, value in dict1.items():
         if key in dict.keys():
             dict1[key] = value.union(dict[key])
 
-    print("new dict", dict1)
+    # print("new dict", dict1)
 
-def getDicFromTuplesByTerm(binding, term):
+def getDicFromTuplesByTerm(key, value):
     dictList = []
-    for value in binding.values():
-        for key in value.keys():
-            if term in key:
-                for v in value[key]:
-                    dic = {}
-                    #dict(zip(key, v))
-                    for i in range(0, len(key)):
-                        dic[key[i]] = set(v[i])
-                    dictList.append(dic)
-    print("get {} in {} results {}".format(term, binding, dictList))
+    for v in value:
+        dic = {}
+        for i in range(0, len(key)):
+            dic[key[i]] = set([v[i]])
+        dictList.append(dic)
+    print("generate new dictList", dictList)
     return dictList
 
 def checkIfDicSetValid(dict):
@@ -309,7 +331,7 @@ def checkIfDicSetValid(dict):
 # for example, (X, Y) = (1, 2) (Y, Z) = (2, 3) ==> (X, Y, Z) = (1, 2, 3)
 # but, (X, Y) = (1, 4) (Y, Z) = (2, 3) ==> (X, Y, Z) = (1, {2,4}, 3), invalid
 def filterDicByNewTermDic(dict, dictNew):
-    print("original dict and new dict", dict, dictNew)
+    # print("original dict and new dict", dict, dictNew)
     if len(dict) == 0:
         dict.extend(dictNew)
         return
@@ -318,7 +340,7 @@ def filterDicByNewTermDic(dict, dictNew):
         for d in dictNew:
             dicFilter = dic.copy()
             mergeTwoDict(dicFilter, d)
-            print("after intersection", dicFilter)
+            # print("after intersection", dicFilter)
             filterList.append(dicFilter)
 
     list = filterList.copy()
@@ -330,28 +352,16 @@ def filterDicByNewTermDic(dict, dictNew):
     dict.extend(filterList)
 
 #generate new facts from header
-def matchHeader(rule, binding, facts):
+def matchHeader(rule, binding, facts, dict):
     # variable = bindingToVariable(binding)
     # print("new variable", variable)
     header = rule.head
-    first = True
-    dict = []
-    for term in header.terms:
-        # if first:
-        #     first = False
-        #     dict = getDicFromTuplesByTerm(binding, term)
-        # else:
-        dictNew = getDicFromTuplesByTerm(binding, term)
-        filterDicByNewTermDic(dict, dictNew)
-        #[{'X': {'a'}, 'Z': {'b'}, 'Y': {'d'}}, {'X': {'a'}, 'Z': {'b'}, 'Y': {'a'}}]
-
-    print("after filter dict", dict)
-
     #now we get all the accept value for header
     newFacts = []
     for d in dict:
         for t in header.terms:
             if not t in d: # free variable in header
+                assert()
                 return newFacts
         if satisfyBuildInPredicate(d, rule.body):
             term = [list(d[x])[0] for x in header.terms]

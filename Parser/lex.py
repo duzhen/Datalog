@@ -16,7 +16,7 @@ tokens = [
     #'NUMBER',       #0-9
     'CONSTANT',      #something
     'VARIABLE',     #X
-    'UNDERSCORE',   #_
+    #'UNDERSCORE',   #_
     'OPERATOR',     #>
     'QUERY',        #?
 ] + list(reserved.values())
@@ -30,9 +30,9 @@ t_DOT = r'\.'
 t_LEFT_PAR = r'\('
 t_RIGHT_PAR = r'\)'
 t_COMMA = r'\,'
-t_VARIABLE = r'[A-Z][a-z]*'
+t_VARIABLE = r'[A-Z][a-z0-9]*'
 t_CONSTANT = r'[a-z0-9][a-zA-Z0-9]*'
-t_UNDERSCORE = r'_'
+# t_UNDERSCORE = r'_'
 t_OPERATOR = r'[!<>=](=)?'
 t_QUERY = r'\?'
 
@@ -49,7 +49,7 @@ def t_NOT(t):
     return t
 
 def t_comment(t):
-    r"[ ]*\043[^\n]*"  # \043 is '#'
+    r"[ ]*\%[^\n]*"  #
     pass
 
 # Keep track of line numbers
