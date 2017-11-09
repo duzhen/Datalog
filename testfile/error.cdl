@@ -12,4 +12,4 @@ path(X, Y) := path(X, Z), path(Z, Y).
 path(a, b)?
 path(f, X), f == e ?
 path(a, X), path(X, d)?
-#edge(f, e).
+%edge(f, e).

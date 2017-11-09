@@ -8,9 +8,9 @@ edge(b, a).
 not edge(f, e).
 
 path(X, Y) :- edge(X, Y), not edge(X, X), not edge(Y, Y).
-#path(X, Y) :- edge(X, Y), X==Y.
-#path(X, Y) :- path(X, Z), path(Z, Y).
-#path(X, X) :- not edge(X, X).
+%path(X, Y) :- edge(X, Y), X==Y.
+%path(X, Y) :- path(X, Z), path(Z, Y).
+%path(X, X) :- not edge(X, X).
 path(X, Y) :- path(X, Z), edge(Z, Y).
 
 
