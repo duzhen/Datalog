@@ -217,6 +217,7 @@ def queryFromFacts(query, facts):
     print("ANSWER:")
     for q in query:
         answer = []
+        builtInVariable, builtInBody = getBuiltInTerm(q.query)
         for p in q.query:
             if p.type == 'predicate':
                 newFacts = getFactsByPredicate(facts, p.predicate, len(p.terms))
@@ -228,10 +229,35 @@ def queryFromFacts(query, facts):
                     answer.append(r)
                 else:
                     for f in newFacts.copy():
+                        remove = False
+                        dict = {}
                         for i in range(0, len(p.terms)):
                             if isLowerCase(p.terms[i]):
                                 if not f.fact.terms[i] == p.terms[i]:
                                     newFacts.remove(f)
+                                    remove = True
+                                    break
+                            elif p.terms[i] in dict.keys():
+                                preValue = dict[p.terms[i]]
+                                if preValue != f.fact.terms[i]:
+                                    newFacts.remove(f)
+                                    remove = True
+                                    break
+                            else:
+                                dict[p.terms[i]] = f.fact.terms[i]
+                        # built-in predicate
+                        if not remove:
+
+                            # for i in range(0, len(p.terms)):
+                            #     if p.terms[i] in dict.keys():
+                            #         preValue = dict[p.terms[i]]
+                            #         if preValue != f.fact.terms[i]:
+                            #             newFacts.remove(f)
+                            #             break
+                            #     else:
+                            #         dict[p.terms[i]] = f.fact.terms[i]
+                            if not evaluateBuiltInPredicate(dict, builtInBody, False):
+                                newFacts.remove(f)
                     answer.append([tuple(x.fact.terms) for x in newFacts])
         # log.trace(answer)
         evaluationLog("{}\n".format(answer))
@@ -597,8 +623,9 @@ def matchHeader(rule, binding, facts, dict):
 
     return newFacts
 
-def checkConstraint(dict, cons):
-    log.trace("operator is {}".format(cons))
+def checkConstraint(dict, cons, verbose=True):
+    if verbose:
+        log.trace("operator is {}".format(cons))
     if isLowerCase(cons.termX):
         x = cons.termX
     else:
@@ -607,7 +634,8 @@ def checkConstraint(dict, cons):
         y = cons.termY
     else:
         y = list(dict[cons.termY])[0]
-    log.debug("x:{}, y:{}".format(x, y))
+    if verbose:
+        log.debug("x:{}, y:{}".format(x, y))
     if x and y:
         operator = cons.operator
         if operator == ">=":
@@ -625,15 +653,17 @@ def checkConstraint(dict, cons):
         else:
             return False
 
-def evaluateBuiltInPredicate(dict, builtin):
+def evaluateBuiltInPredicate(dict, builtin, verbose=True):
     # X==Y, can precess directly, <=, >= >, < need the variable ground
     # builtInBody = []
-    log.trace("Start evaluate built-in predicate, value {}, builtin {}".format(dict, builtin))
+    if verbose:
+        log.trace("Start evaluate built-in predicate, value {}, builtin {}".format(dict, builtin))
     for body in builtin:
         if body.type == 'constraint':
             # builtInBody.append(body)
-            if not checkConstraint(dict, body):
-                log.debug("{} does not satisfy builtIn predicate".format(dict))
+            if not checkConstraint(dict, body, verbose):
+                if verbose:
+                    log.debug("{} does not satisfy builtIn predicate".format(dict))
                 return False
     return True
 

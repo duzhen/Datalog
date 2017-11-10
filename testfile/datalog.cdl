@@ -1,4 +1,5 @@
 edge(a, b).
+edge(a, k).
 edge(a, c).
 edge(b, d).
 edge(c, d).
@@ -16,6 +17,6 @@ path(X, Y) :- edge(X, Y).%, X==Y.
 
 
 path(a, b)?
-path(f, X), X != e?
+path(X, X), X != a?
 path(a, X), path(X, d)?
 not path(X, e)?
