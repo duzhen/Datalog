@@ -45,16 +45,15 @@ log.setLevel(logging.DEBUG)
 log.addHandler(fh)
 log.addHandler(ch)
 
-def evaluationLog(log):
+def evaluationLog(l):
     if not RELEASE:
-        Parser.yacc.out.write(log)
+        Parser.yacc.out.write(l)
 
 def main(argv):
     log.trace("Start Parser File")
     facts = []
     rules = []
     query = []
-    warning = False
     parser = Parser.yacc.parser
     file = open(argv[1], 'r')
     program = parser.parse(file.read())
@@ -69,29 +68,8 @@ def main(argv):
             rules.append(p)
         elif p.type == 'query':
             query.append(p)
-    for fact in facts.copy():
-        if not isLowerCaseList(fact.fact.terms):
-            facts.remove(fact)
-            evaluationLog("Warning! Fact is not ground\n" + str(fact))
-            warning = True
-    for q in query.copy():
-        for p in q.query:
-            if p.type == 'predicate':
-                if p.isNegated and not isLowerCaseList(p.terms):
-                    query.remove(q)
-                    evaluationLog("\nWarning! Query value but with negation\n" + str(q))
-                    warning = True
-    if len(Parser.yacc.errorList) == 0:
-        if warning:
-            log.trace("Parser success, warning save in evaluation.log")
-        else:
-            log.trace("Parser success, no error found")
-    else:
-        log.trace("Parser failed, error save in evaluation.log")
 
-    log.debug("Fact:".format(facts))
-    log.debug("Rule".format(rules))
-    log.debug("Query".format(query))
+    checkProgramValidity(facts, rules, query)
 
     G = nx.DiGraph() #used for evaluation
     G2 = nx.DiGraph() # for stratified check
@@ -151,6 +129,56 @@ def main(argv):
     log.trace("Perform query by the facts")
     queryFromFacts(query, facts)
 
+def checkProgramValidity(facts, rules, query):
+    warning = False
+    for fact in facts.copy():
+        if not isLowerCaseList(fact.fact.terms):
+            facts.remove(fact)
+            evaluationLog("Warning! Fact is not ground\n{}\n".format(str(fact)))
+            log.warning("Warning! Fact is not ground")
+            warning = True
+    for q in query.copy():
+        for p in q.query:
+            if p.type == 'predicate':
+                if p.isNegated and not isLowerCaseList(p.terms):
+                    query.remove(q)
+                    evaluationLog("\nWarning! Query value but with negation\n{}\n".format(str(q)))
+                    log.warning("Warning! Query variable value but with negation")
+                    warning = True
+    for rule in rules.copy():
+        if isLowerCaseList(rule.head.terms):
+            break
+        for t in rule.head.terms:
+            vList = []
+            for s in [x.terms for x in rule.body if x.type == 'predicate']:
+                vList.extend(s)
+            # log.debug("body variables {}".format(vList))
+            if isLowerCase(t):
+                rules.remove(rule)
+                evaluationLog("\nWarning! Header has variable\n{}\n".format(str(rule)))
+                log.warning("Warning! Header has variable")
+                warning = True
+                break
+            elif not t in vList:
+                rules.remove(rule)
+                evaluationLog("\nWarning! Variable appears in Header but not in body\n{}\n".format(str(rule)))
+                log.warning("Warning! Variable appears in Header but not in body")
+                warning = True
+                break
+
+    if len(Parser.yacc.errorList) == 0:
+        if warning:
+            log.trace("Parser success, but warning in evaluation.log")
+        else:
+            log.trace("Parser success, no error found")
+    else:
+        log.trace("Parser failed, error save in evaluation.log")
+
+    log.debug("Fact:{}".format(facts))
+    log.debug("Rule:{}".format(rules))
+    log.debug("Query:{}".format(query))
+
+    return
 def checkStratified(G, cycle):
     log.trace("Check if negation cycle in EDG, {}".format(cycle))
     edges = [zip(nodes, (nodes[1:] + nodes[:1])) for nodes in cycle]
@@ -248,6 +276,12 @@ def matchGoals(facts, rule):
         # else not negated
         if body.type == 'predicate':
             log.trace("Start match predicate {}".format(body))
+            if isLowerCaseList(body.terms):
+                exist = body.terms in [x.fact.terms for x in facts]
+                log.debug("Body is a ground clause, value is {}".format(exist))
+                if not exist:
+                    return
+
             b_facts = getFactsByPredicate(facts, body.predicate)
             log.debug("in body {} get fact {}".format(body.predicate, b_facts))
             log.trace("Find {} facts with this predicate".format(len(b_facts)))
@@ -257,10 +291,10 @@ def matchGoals(facts, rule):
             else:
                 for b_fact in b_facts:
                     if not unifyBinding(b_fact.fact, body, binding, bindingFact, facts):
-                        return
+                        continue
         else:
             builtInBody.append(body)
-            log.trace("Temp save one built-in predicate {}", body)
+            log.trace("Temp save one built-in predicate {}".format(body))
     if not len(bindingFact) == 0 and len(binding) == 0 and isLowerCaseList(rule.head.terms):
         fact = Fact(rule.head)
         if not (checkFactExist(facts, fact)):
@@ -268,7 +302,7 @@ def matchGoals(facts, rule):
             return [fact]
         else:
             return []
-    log.trace("Start match built-in predicate {}", builtInBody)
+    log.trace("Start match built-in predicate {}".format(builtInBody))
     # do some thing for builtIn predicate
     dict = globalIntersection(binding, rule.body)
     return matchHeader(rule, binding, facts, dict)
@@ -513,7 +547,8 @@ def satisfybuiltInPredicate(dict, body):
 def checkFactExist(facts, fact):
     return fact in facts
 
-#get variable tuple for each goal
+# get variable tuple for each goal
+# p1: fact, p2:body
 def unifyBinding(p1, p2, binding, bindingFact, facts):
     if len(p1.terms) == len(p2.terms):
         # keys = (x for x in p1.terms)
@@ -522,27 +557,39 @@ def unifyBinding(p1, p2, binding, bindingFact, facts):
         #     print(p1.terms[i])
         #     print(p2.terms[i])
         log.debug("fact is {}, body is {}".format(p1, p2))
-        if isUpperCaseList(p2.terms):
+        if True:#isUpperCaseList(p2.terms):
             variable = {}
             if p2.predicate in binding.keys():
                 variable = binding[p2.predicate]
 
+            termsKey = p2.terms.copy()
+            termsValue = p1.terms.copy()
+            for i in range(0, len(p2.terms)):
+               if isLowerCase(p2.terms[i]):
+                   if p1.terms[i] != p2.terms[i]:
+                        log.warning("Body terms contains constant not equal with current facts, skip")
+                        return False
+                   else:
+                       termsKey.remove(p2.terms[i])
+                       termsValue.remove(p1.terms[i])
             value = []
-            if tuple(p2.terms) in variable.keys():
-                value = variable[tuple(p2.terms)]
-            value.append(p1.terms)
+            if tuple(termsKey) in variable.keys():
+                value = variable[tuple(termsKey)]
+            value.append(termsValue)
 
-            variable[tuple(p2.terms)] = value
+            variable[tuple(termsKey)] = value
             binding[p2.predicate] = variable
-            log.trace("Collect all the potential tuple values for {}".format(p2))
-            log.debug("binding is {}".format(binding))
-        elif isLowerCaseList(p2.terms):
-            exist = p2.terms in [x.fact.terms for x in facts]
-            bindingFact.append(exist)
-            log.debug("Body is a ground clause, value is {}".format(exist))
-            return exist
-
-    return True
+            log.trace("Collect potential tuple values for {}".format(p2))
+            log.debug("potential value is {}".format(binding))
+        # elif isLowerCaseList(p2.terms):
+        #     exist = p2.terms in [x.fact.terms for x in facts]
+        #     bindingFact.append(exist)
+        #     log.debug("Body is a ground clause, value is {}".format(exist))
+        #     return exist
+        else:
+            log.warning("Terms contains constant, terms is {}".format(p2.terms))
+        return True
+    return False
 def isUpperCaseList(list):
     for i in list:
         if not i.istitle():
