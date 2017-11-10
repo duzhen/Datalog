@@ -84,7 +84,7 @@ person(X) :- female(X).
 married(Me, Spouse) :- married(Spouse, Me).
 child(Child, Parent) :- child(Child, Spouse), married(Parent, Spouse).
 parent(Parent, Child) :- child(Child, Parent).
-sibling(Me, Who) :- parent(Parent, Me), parent(Parent, Who), Me <> Who.
+sibling(Me, Who) :- parent(Parent, Me), parent(Parent, Who), Me != Who.
 brother(Me, He) :- sibling(Me, He), male(He).
 sister(Me, She) :- sibling(Me, She), female(She).
 ancestor(Ancestor, Descendant) :- parent(Ancestor, Descendant).
@@ -95,7 +95,7 @@ mother(Mother, Child) :- parent(Mother, Child), female(Mother).
 grandparent(Grandparent, Grandchild) :- parent(Grandparent, Parent), parent(Parent, Grandchild).
 grandfather(Grandfather, Grandchild) :- grandparent(Grandfather, Grandchild), male(Grandfather).
 grandmother(Grandmother, Grandchild) :- grandparent(Grandmother, Grandchild), female(Grandmother).
-cousin(Me, Who) :- grandparent(Grandparent, Me), grandparent(Grandparent, Who), Me <> Who.
+cousin(Me, Who) :- grandparent(Grandparent, Me), grandparent(Grandparent, Who), Me != Who.
 related(Me, Who) :- ancestor(Ancestor, Me), ancestor(Ancestor, Who).
 employed(Who) :- worksat(Who, Company).
 unemployed(Who) :- person(Who), not employed(Who), not retired(Who).

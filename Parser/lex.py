@@ -30,23 +30,30 @@ t_DOT = r'\.'
 t_LEFT_PAR = r'\('
 t_RIGHT_PAR = r'\)'
 t_COMMA = r'\,'
-t_VARIABLE = r'[A-Z][a-z0-9]*'
-t_CONSTANT = r'[a-z0-9][a-zA-Z0-9]*'
+t_VARIABLE = r'[A-Z][A-Za-z0-9_]*'
+# t_CONSTANT = r'[a-z0-9][a-zA-Z0-9_.]*'
 # t_UNDERSCORE = r'_'
 t_OPERATOR = r'[!<>=](=)?'
 t_QUERY = r'\?'
 
+def t_CONSTANT(t):
+    r'[a-z0-9_][a-zA-Z_0-9.]*'
+    # Check for reserved words
+    t.type = reserved.get(t.value, 'CONSTANT')
+    return t
+
 # t_NUMBER = r'\d+'
-
-def t_AND(t):
-    r'[a-z][a-z]*'
-    t.type = reserved.get(t.value, 'CONSTANT')  # Check for reserved words
-    return t
-
-def t_NOT(t):
-    r'[a-z][a-z]*'
-    t.type = reserved.get(t.value, 'CONSTANT')  # Check for reserved words
-    return t
+#
+# def t_AND(t):
+#     r'[a-z][a-z]*'
+#     t.type = reserved.get(t.value, 'CONSTANT')  # Check for reserved words
+#     return t
+#
+# def t_NOT(t):
+#     r'not'
+#     # r'[a-z][a-z]*'
+#     t.type = reserved.get(t.value, 'CONSTANT')  # Check for reserved words
+#     return t
 
 def t_comment(t):
     r"[ ]*\%[^\n]*"  #

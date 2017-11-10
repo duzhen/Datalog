@@ -5,11 +5,28 @@ from deprecation import deprecated
 import networkx as nx
 import logging
 import time
+import argparse
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import Parser.yacc
 from Parser.model import Fact, Predicate
+
+parser = argparse.ArgumentParser(description="Datalog bottom-up interpreter by Python, support Naive, Semi-Naive, Built-In predicate, stratified, simple negation query")
+
+subparsers = parser.add_subparsers(help='commands')
+
+naive_parser = subparsers.add_parser('naive', help='Bottom up evaluation with naive method search.')
+naive_parser.set_defaults(which='naive')
+
+semi_parser = subparsers.add_parser('semi-naive', help='Bottom up evaluation with semi-naive method search')
+semi_parser.set_defaults(which='semi-naive')
+
+parser.add_argument("file", help="Datalog program file")
+
+args = parser.parse_args()
+
+
 
 RELEASE = False
 TRACE_LEVEL = 39
@@ -55,7 +72,7 @@ def main(argv):
     rules = []
     query = []
     parser = Parser.yacc.parser
-    file = open(argv[1], 'r')
+    file = open(args.file, 'r')
     program = parser.parse(file.read())
     for e in Parser.yacc.errorList:
         evaluationLog(e)
@@ -73,7 +90,7 @@ def main(argv):
 
     G = nx.DiGraph() #used for evaluation
     G2 = nx.DiGraph() # for stratified check
-    evaluationLog("\nFACT:\n")
+    evaluationLog("FACT:\n")
     for f in facts:
         evaluationLog(str(f) + "\n")
 
@@ -100,6 +117,8 @@ def main(argv):
     evaluationLog("\nQUERY:\n")
     for q in query:
         evaluationLog(str(q) + "\n")
+
+    evaluationLog("\n{}\n".format("\nNEW FACTS:\n"))
     #check stratified
     cycle = list(nx.simple_cycles(G2))
     if not len(cycle) == 0:
@@ -118,7 +137,8 @@ def main(argv):
     #     log.trace('cut the cycle graph, get topological sort: {}'.format(dependsList2))
     #Naive part
     #for each node in topological sort, implement of Extend dependency graph
-    log.trace("Perform Naive evaluation method")
+    if not args.which == 'semi-naive':
+        log.trace("Perform Naive evaluation method")
     engine(dependsList, facts, rules)
     # engine(dependsList2, facts, rules)
     log.debug("Finish Naive evaluation method")
@@ -137,14 +157,7 @@ def checkProgramValidity(facts, rules, query):
             evaluationLog("Warning! Fact is not ground\n{}\n".format(str(fact)))
             log.warning("Warning! Fact is not ground")
             warning = True
-    for q in query.copy():
-        for p in q.query:
-            if p.type == 'predicate':
-                if p.isNegated and not isLowerCaseList(p.terms):
-                    query.remove(q)
-                    evaluationLog("\nWarning! Query value but with negation\n{}\n".format(str(q)))
-                    log.warning("Warning! Query variable value but with negation")
-                    warning = True
+
     for rule in rules.copy():
         if isLowerCaseList(rule.head.terms):
             break
@@ -161,10 +174,18 @@ def checkProgramValidity(facts, rules, query):
                 break
             elif not t in vList:
                 rules.remove(rule)
-                evaluationLog("\nWarning! Variable appears in Header but not in body\n{}\n".format(str(rule)))
-                log.warning("Warning! Variable appears in Header but not in body")
+                evaluationLog("\nWarning! Variable appears in header but not in body\n{}\n".format(str(rule)))
+                log.warning("Warning! Variable appears in header but not in body")
                 warning = True
                 break
+    for q in query.copy():
+        for p in q.query:
+            if p.type == 'predicate':
+                if p.isNegated and not isLowerCaseList(p.terms):
+                    query.remove(q)
+                    evaluationLog("\nWarning! Query value but with negation\n{}\n".format(str(q)))
+                    log.warning("Warning! Query variable value but with negation")
+                    warning = True
 
     if len(Parser.yacc.errorList) == 0:
         if warning:
@@ -192,6 +213,7 @@ def checkStratified(G, cycle):
 
 def queryFromFacts(query, facts):
     log.trace("ANSWER:")
+    evaluationLog("\n{}\n".format("ANSWER:"))
     print("ANSWER:")
     for q in query:
         answer = []
@@ -212,15 +234,37 @@ def queryFromFacts(query, facts):
                                     newFacts.remove(f)
                     answer.append([tuple(x.fact.terms) for x in newFacts])
         # log.trace(answer)
+        evaluationLog("{}\n".format(answer))
         print(answer)
 
 def builtRelativeRule(rules):
-    return
+    semiRules = {}
+    for rule in rules:
+        if not rule.head.predicate in semiRules.keys():
+            semiRules[rule.head.predicate] = []
+        rs = semiRules[rule.head.predicate]
+        rs.append(rule)
+        for body in rule.body:
+            if body.type == 'predicate':
+                if not body.predicate in semiRules.keys():
+                    semiRules[body.predicate] = []
+                rs = semiRules[body.predicate]
+                rs.append(rule)
+    log.debug("Built semi rules {}".format(semiRules))
+    return semiRules
 
-def getRuleByNewFact(facts):
-    return
+def getRuleByNewFact(facts, semiRules):
+    rules = set()
+    for f in facts:
+        for r in semiRules[f.fact.predicate]:
+            rules.add(r)
+    return rules
 
 def engine(dependsList, facts, rules):
+    if args.which == 'semi-naive':
+        log.trace("Perform Semi-Naive evaluation method")
+        semiRules = builtRelativeRule(rules)
+        rules = getRuleByNewFact(facts, semiRules)
     for i in range(0, len(dependsList)):
         depend = dependsList[i]
         # if not depend in [f.fact.predicate for f in facts]:
@@ -231,7 +275,6 @@ def engine(dependsList, facts, rules):
         #     else:
         #         continue
     # for depend in dependsList:
-        semiRules = builtRelativeRule(rules)
         while True:
             log.trace("Evaluation predicate <{}> in EDB".format(depend))
             newFacts = []
@@ -256,9 +299,10 @@ def engine(dependsList, facts, rules):
                 evaluationLog("*{}\n".format(f))
                 log.debug("******{}".format(f))
             facts.extend(newFacts)
-            if False:#semi-naive
+            if args.which == 'semi-naive':
                 # semi-naive part
-                rules = getRuleByNewFact(facts)
+                rules = getRuleByNewFact(facts, semiRules)
+                log.trace("Semi-Naive derive this rules {}".format(rules))
     log.trace("Achieved least fix-point totally {} facts.".format(len(facts)))
 
 # match all the goals in the rule
@@ -641,21 +685,21 @@ def unifyBinding(p1, p2, binding, facts):
     return False
 def isUpperCaseList(list):
     for i in list:
-        if not i.istitle():
+        if not i[0].isupper():
             return False
     return True
 
 def isLowerCaseList(list):
     for i in list:
-        if i.istitle():
+        if i[0].isupper():
             return False
     return True
 
 def isUpperCase(c):
-    return c.istitle()
+    return c[0].isupper()
 
 def isLowerCase(c):
-    return not c.istitle()
+    return not c[0].isupper()
 
 #get the relative facts
 def getFactsByPredicate(facts, name, termLength=None):
@@ -665,9 +709,9 @@ def getFactsByPredicate(facts, name, termLength=None):
         return [x for x in facts if x is not None and x.fact.predicate == name]
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Usage: python datalog.py datalog.cdl')
-        sys.exit(-1)
+    # if len(sys.argv) != 2:
+    #     print('Usage: python datalog.py datalog.cdl')
+    #     sys.exit(-1)
     start = time.time()
     main(sys.argv)
     Parser.yacc.out.close()
