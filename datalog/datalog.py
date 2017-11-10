@@ -264,8 +264,6 @@ def engine(dependsList, facts, rules):
 # match all the goals in the rule
 def matchGoals(facts, rule):
     binding = {}
-    bindingFact = [] # for fact in body
-    builtInBody = []
     #for each goal in body
     for body in rule.body:
         # print(body)
@@ -281,6 +279,8 @@ def matchGoals(facts, rule):
                 log.debug("Body is a ground clause, value is {}".format(exist))
                 if not exist:
                     return
+                else:
+                    continue
 
             b_facts = getFactsByPredicate(facts, body.predicate)
             log.debug("in body {} get fact {}".format(body.predicate, b_facts))
@@ -290,20 +290,19 @@ def matchGoals(facts, rule):
                 return
             else:
                 for b_fact in b_facts:
-                    if not unifyBinding(b_fact.fact, body, binding, bindingFact, facts):
+                    if not unifyBinding(b_fact.fact, body, binding, facts):
                         continue
-        else:
-            builtInBody.append(body)
-            log.trace("Temp save one built-in predicate {}".format(body))
-    if not len(bindingFact) == 0 and len(binding) == 0 and isLowerCaseList(rule.head.terms):
+        # else:
+        #     builtInBody.append(body)
+        #     log.trace("Temp save one built-in predicate {}".format(body))
+    if len(binding) == 0 and isLowerCaseList(rule.head.terms):
         fact = Fact(rule.head)
         if not (checkFactExist(facts, fact)):
             log.trace("******Get new fact {}".format(fact))
             return [fact]
         else:
             return []
-    log.trace("Start match built-in predicate {}".format(builtInBody))
-    # do some thing for builtIn predicate
+
     dict = globalIntersection(binding, rule.body)
     return matchHeader(rule, binding, facts, dict)
 
@@ -333,21 +332,32 @@ def globalIntersection(binding, body):
     variable = bindingToVariable(binding, body)
     filterBinding(binding, variable)
 
+    log.trace("evaluate built-in predicate before do global intersection")
+    builtInVariable, builtInBody = getBuiltInTerm(body)
     dict = []
     # for term in ['X', 'Y']:
     log.trace("Perform global intersection")
     for value in binding.values():
         for key, v in value.items():
-            # if first:
-            #     first = False
-            #     dict = getDicFromTuplesByTerm(binding, term)
-            # else:
-            dictNew = getDicFromTuplesByTerm(key, v)
+            dictNew = getDicFromTuplesByTerm(key, v, builtInVariable, builtInBody)
             filterDicByNewTermDic(dict, dictNew)
             # [{'X': {'a'}, 'Z': {'b'}, 'Y': {'d'}}, {'X': {'a'}, 'Z': {'b'}, 'Y': {'a'}}]
 
     log.debug("After do intersection, dictionary is {}".format(dict))
     return dict
+
+
+def getBuiltInTerm(body):
+    builtInBody = []
+    builtInVariable = set()
+    for b in body:
+        if b.type == 'constraint':
+            builtInBody.append(b)
+            if not isLowerCase(b.termX):
+                builtInVariable.add(b.termX)
+            if not isLowerCase(b.termY):
+                builtInVariable.add(b.termY)
+    return builtInVariable, builtInBody
 
 def checkBodyNegative(predicate, key, body):
     log.trace("check negative {}, key is {}".format(predicate, key))
@@ -468,13 +478,16 @@ def mergeTwoDict(dict1, dict2):
     log.debug("Get new dictionary {}", dict)
     # print("new dict", dict1)
 
-def getDicFromTuplesByTerm(key, value):
+def getDicFromTuplesByTerm(key, value, builtInVariable, builtInBody):
     log.trace("Get dictionary value from facts{}".format(key))
     dictList = []
     for v in value:
         dic = {}
         for i in range(0, len(key)):
             dic[key[i]] = set([v[i]])
+        if set(key) >= builtInVariable:
+            if not evaluateBuiltInPredicate(dic, builtInBody):
+                continue
         dictList.append(dic)
     log.debug("generate new dictList {}".format(dictList))
     return dictList
@@ -506,7 +519,7 @@ def filterDicByNewTermDic(dict, dictNew):
     list = filterList.copy()
     for f in list:
         if not checkIfDicSetValid(f):
-            log.trace("I don't want to see some dict is out of the filter")
+            log.trace("I don't want to see some dict is out of the filter in mergeTwoDict process")
             filterList.remove(f)
     dict.clear()
     dict.extend(filterList)
@@ -517,6 +530,7 @@ def matchHeader(rule, binding, facts, dict):
     # print("new variable", variable)
     log.trace("start to match header {}".format(rule.head.predicate))
     header = rule.head
+    builtInVariable, builtInBody = getBuiltInTerm(rule.body)
     #now we get all the accept value for header
     newFacts = []
     for d in dict:
@@ -524,7 +538,7 @@ def matchHeader(rule, binding, facts, dict):
             if not t in d: # free variable in header
                 assert()
                 return newFacts
-        if satisfybuiltInPredicate(d, rule.body):
+        if evaluateBuiltInPredicate(d, builtInBody):
             term = [list(d[x])[0] for x in header.terms]
             # print("get terms", term)
             fact = Fact(Predicate(header.predicate, term, header.isNegated))
@@ -539,9 +553,44 @@ def matchHeader(rule, binding, facts, dict):
 
     return newFacts
 
-def satisfybuiltInPredicate(dict, body):
-    #X==Y, can precess directly, <=, >= >, < need the variable ground
-    log.trace("Perform builtIn predicate check {}".format(body))
+def checkConstraint(dict, cons):
+    log.trace("operator is {}".format(cons))
+    if isLowerCase(cons.termX):
+        x = cons.termX
+    else:
+        x = list(dict[cons.termX])[0]
+    if isLowerCase(cons.termY):
+        y = cons.termY
+    else:
+        y = list(dict[cons.termY])[0]
+    log.debug("x:{}, y:{}".format(x, y))
+    if x and y:
+        operator = cons.operator
+        if operator == ">=":
+            return x >= y
+        elif operator == "<=":
+            return x <= y
+        elif operator == ">":
+            return x > y
+        elif operator == "<":
+            return x < y
+        elif "!" in operator:
+            return x != y
+        elif operator == "==" or operator == "=":
+            return x == y
+        else:
+            return False
+
+def evaluateBuiltInPredicate(dict, builtin):
+    # X==Y, can precess directly, <=, >= >, < need the variable ground
+    # builtInBody = []
+    log.trace("Start evaluate built-in predicate, value {}, builtin {}".format(dict, builtin))
+    for body in builtin:
+        if body.type == 'constraint':
+            # builtInBody.append(body)
+            if not checkConstraint(dict, body):
+                log.debug("{} does not satisfy builtIn predicate".format(dict))
+                return False
     return True
 
 def checkFactExist(facts, fact):
@@ -549,7 +598,7 @@ def checkFactExist(facts, fact):
 
 # get variable tuple for each goal
 # p1: fact, p2:body
-def unifyBinding(p1, p2, binding, bindingFact, facts):
+def unifyBinding(p1, p2, binding, facts):
     if len(p1.terms) == len(p2.terms):
         # keys = (x for x in p1.terms)
         # print(keys)

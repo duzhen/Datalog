@@ -2,9 +2,11 @@ edge(a, b).
 edge(b, c).
 edge(b, b).
 
-path(X, Y) :- edge(X, b), edge(b, Y).
-%path(X, Y) :- edge(X, Y), X==c.
-%path(X, Y) :- edge(X, Y), X==Y.
 
-path(a, c)?
+%path(X, Y) :- edge(X, b), edge(b, Y).
+path(X, Y) :- edge(X, Y), X==a.
+%path(X, Y) :- edge(X, Y), X==Y.
+path(X, Y) :- edge(X, Y), X!=Y.
+
+path(a, b)?
 path(b, b)?
