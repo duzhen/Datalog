@@ -125,7 +125,7 @@ def p_error(p):
     errorList.append("Syntax error in input! " + str(p) + "\n")
     print("Syntax error in input! ", p)
 
-out = open('parser.log', 'w')
+out = open('evaluation.log', 'w')
 parser = yacc.yacc(start='program', write_tables=False, debug=False)
 
 

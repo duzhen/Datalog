@@ -4,6 +4,7 @@ import copy
 from deprecation import deprecated
 import networkx as nx
 import logging
+import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,6 +32,7 @@ def debug(self, message, *args, **kws):
         self._log(logging.DEBUG, message, args, **kws)
 
 logging.Logger.trace = trace
+logging.Logger.debug = debug
 
 fh = logging.FileHandler('trace.log')
 fh.setLevel(TRACE_LEVEL)
@@ -43,7 +45,7 @@ log.setLevel(logging.DEBUG)
 log.addHandler(fh)
 log.addHandler(ch)
 
-def parserLog(log):
+def evaluationLog(log):
     if not RELEASE:
         Parser.yacc.out.write(log)
 
@@ -57,7 +59,7 @@ def main(argv):
     file = open(argv[1], 'r')
     program = parser.parse(file.read())
     for e in Parser.yacc.errorList:
-        parserLog(e)
+        evaluationLog(e)
     if not program:
         return
     for p in program:
@@ -70,59 +72,95 @@ def main(argv):
     for fact in facts.copy():
         if not isLowerCaseList(fact.fact.terms):
             facts.remove(fact)
-            parserLog("Warning! Fact is not ground\n" + str(fact))
+            evaluationLog("Warning! Fact is not ground\n" + str(fact))
             warning = True
     for q in query.copy():
         for p in q.query:
             if p.type == 'predicate':
                 if p.isNegated and not isLowerCaseList(p.terms):
                     query.remove(q)
-                    parserLog("\nWarning! Query value but with negation\n" + str(q))
+                    evaluationLog("\nWarning! Query value but with negation\n" + str(q))
                     warning = True
     if len(Parser.yacc.errorList) == 0:
         if warning:
-            log.trace("Parser success, warning save in parser.log")
+            log.trace("Parser success, warning save in evaluation.log")
         else:
             log.trace("Parser success, no error found")
     else:
-        log.trace("Parser failed, error save in parser.log")
+        log.trace("Parser failed, error save in evaluation.log")
 
-    log.debug(facts)
-    log.debug(rules)
-    log.debug(query)
+    log.debug("Fact:".format(facts))
+    log.debug("Rule".format(rules))
+    log.debug("Query".format(query))
 
-    G = nx.DiGraph()
-
-    parserLog("\nFACT:\n")
+    G = nx.DiGraph() #used for evaluation
+    G2 = nx.DiGraph() # for stratified check
+    evaluationLog("\nFACT:\n")
     for f in facts:
-        parserLog(str(f) + "\n")
+        evaluationLog(str(f) + "\n")
 
-    parserLog("\nRULE:\n")
+    evaluationLog("\nRULE:\n")
     for r in rules:
-        parserLog(str(r) + "\n")
+        evaluationLog(str(r) + "\n")
         for body in r.body:
-            if body.type == 'predicate' and not body.predicate == r.head.predicate \
-                    and not G.has_edge(r.head.predicate, body.predicate):
-                G.add_edge(body.predicate, r.head.predicate)
+            if body.type == 'predicate':
+                weight = 1
+                if body.isNegated:
+                    weight = 0
+                edge = (body.predicate, r.head.predicate)
+                data = G2.get_edge_data(*edge)
+                if data:
+                    data['weight'] = data['weight'] * weight
+                else:
+                    G2.add_edge(body.predicate, r.head.predicate, weight=weight)
 
-    parserLog("\nQUERY:\n")
+                if body.predicate == r.head.predicate:
+                    G.add_node(body.predicate)
+                else:
+                    if not G.has_edge(r.head.predicate, body.predicate):
+                        G.add_edge(body.predicate, r.head.predicate)
+    evaluationLog("\nQUERY:\n")
     for q in query:
-        parserLog(str(q) + "\n")
-
+        evaluationLog(str(q) + "\n")
+    #check stratified
+    cycle = list(nx.simple_cycles(G2))
+    if not len(cycle) == 0:
+        if not checkStratified(G2, cycle):
+            log.error("Datalog program do not satisfy the stratified safety")
+            return
     depends = nx.topological_sort(G)
+    # depends2= nx.topological_sort(G2)
     dependsList = list(depends)
+    # dependsList2 = list(depends2)
     log.trace('Topological sort: {}'.format(dependsList))
+    if len(dependsList) == 0:
+        log.trace("No valid rule to do the evaluation")
+        return
+    # if len(dependsList2) != 0:
+    #     log.trace('cut the cycle graph, get topological sort: {}'.format(dependsList2))
     #Naive part
     #for each node in topological sort, implement of Extend dependency graph
     log.trace("Perform Naive evaluation method")
     engine(dependsList, facts, rules)
+    # engine(dependsList2, facts, rules)
     log.debug("Finish Naive evaluation method")
-    log.debug("Get all the facts {}".format(len(facts)))
+    log.debug("Totally have {} facts.".format(len(facts)))
     for f in facts:
         log.trace(f)
 
     log.trace("Perform query by the facts")
     queryFromFacts(query, facts)
+
+def checkStratified(G, cycle):
+    log.trace("Check if negation cycle in EDG, {}".format(cycle))
+    edges = [zip(nodes, (nodes[1:] + nodes[:1])) for nodes in cycle]
+    for c in edges:
+        for e in c:
+            data = G.get_edge_data(*e)
+            if data['weight'] == 0:
+                log.trace("There is negation cycle in EDG, {}".format(cycle))
+                return False
+    return True
 
 def queryFromFacts(query, facts):
     log.trace("ANSWER:")
@@ -148,7 +186,7 @@ def queryFromFacts(query, facts):
         # log.trace(answer)
         print(answer)
 
-def buildRelativeRule(rules):
+def builtRelativeRule(rules):
     return
 
 def getRuleByNewFact(facts):
@@ -165,7 +203,7 @@ def engine(dependsList, facts, rules):
         #     else:
         #         continue
     # for depend in dependsList:
-        semiRules = buildRelativeRule(rules)
+        semiRules = builtRelativeRule(rules)
         while True:
             log.trace("Evaluation predicate <{}> in EDB".format(depend))
             newFacts = []
@@ -187,20 +225,23 @@ def engine(dependsList, facts, rules):
                 break
             log.debug("New facts:")
             for f in newFacts:
-                log.debug("*{}".format(f))
+                evaluationLog("*{}\n".format(f))
+                log.debug("******{}".format(f))
             facts.extend(newFacts)
             if False:#semi-naive
                 # semi-naive part
                 rules = getRuleByNewFact(facts)
-    log.trace("Get {} new facts, achieved least fix-point!".format(len(facts)))
+    log.trace("Achieved least fix-point totally {} facts.".format(len(facts)))
 
 # match all the goals in the rule
 def matchGoals(facts, rule):
     binding = {}
+    bindingFact = [] # for fact in body
+    builtInBody = []
     #for each goal in body
     for body in rule.body:
         # print(body)
-        # if body.buildin:
+        # if body.builtin:
         #     do some thing
         # if body is negated:
         #     do some thing
@@ -215,10 +256,20 @@ def matchGoals(facts, rule):
                 return
             else:
                 for b_fact in b_facts:
-                    if not unifyBinding(b_fact.fact, body, binding, facts):
+                    if not unifyBinding(b_fact.fact, body, binding, bindingFact, facts):
                         return
         else:
-            log.trace("Start match build-in predicate {}", body)
+            builtInBody.append(body)
+            log.trace("Temp save one built-in predicate {}", body)
+    if not len(bindingFact) == 0 and len(binding) == 0 and isLowerCaseList(rule.head.terms):
+        fact = Fact(rule.head)
+        if not (checkFactExist(facts, fact)):
+            log.trace("******Get new fact {}".format(fact))
+            return [fact]
+        else:
+            return []
+    log.trace("Start match built-in predicate {}", builtInBody)
+    # do some thing for builtIn predicate
     dict = globalIntersection(binding, rule.body)
     return matchHeader(rule, binding, facts, dict)
 
@@ -367,12 +418,19 @@ def getVariableTuple(binding, key, keyValue):
 # value of dict express by set
 def mergeTwoDict(dict1, dict2):
     # print("before update", dict1, dict2)
+    for key, value in dict1.items():
+        if key in dict2.keys() and not value == dict2[key]:
+            return
     dict = dict1.copy()
     dict1.update(dict2)
     # print("previous dict and new dict1", dict, dict1)
     for key, value in dict1.items():
         if key in dict.keys():
             dict1[key] = value.union(dict[key])
+    if not checkIfDicSetValid(dict1):
+        log.trace("I should check first, not check after.")
+        return
+    return dict1
     log.debug("Get new dictionary {}", dict)
     # print("new dict", dict1)
 
@@ -407,14 +465,14 @@ def filterDicByNewTermDic(dict, dictNew):
     for dic in dict:
         for d in dictNew:
             dicFilter = dic.copy()
-            mergeTwoDict(dicFilter, d)
-            # print("after intersection", dicFilter)
-            filterList.append(dicFilter)
+            newDic = mergeTwoDict(dicFilter, d)
+            if newDic:
+                filterList.append(dicFilter)
     log.trace("Check satisfy for each dictionary, if len(value) > 1, then remove it")
     list = filterList.copy()
     for f in list:
         if not checkIfDicSetValid(f):
-            # print("remove dit", f)
+            log.trace("I don't want to see some dict is out of the filter")
             filterList.remove(f)
     dict.clear()
     dict.extend(filterList)
@@ -432,12 +490,12 @@ def matchHeader(rule, binding, facts, dict):
             if not t in d: # free variable in header
                 assert()
                 return newFacts
-        if satisfyBuildInPredicate(d, rule.body):
+        if satisfybuiltInPredicate(d, rule.body):
             term = [list(d[x])[0] for x in header.terms]
             # print("get terms", term)
             fact = Fact(Predicate(header.predicate, term, header.isNegated))
             if not (checkFactExist(facts, fact) or checkFactExist(newFacts, fact)):
-                log.trace("*Get new fact".format(fact))
+                log.trace("******Get new fact {}".format(fact))
                 newFacts.append(fact)
         # possible = getVariablePossibleValue(variable, term)
         # print("possible value for", term, possible)
@@ -447,16 +505,16 @@ def matchHeader(rule, binding, facts, dict):
 
     return newFacts
 
-def satisfyBuildInPredicate(dict, body):
+def satisfybuiltInPredicate(dict, body):
     #X==Y, can precess directly, <=, >= >, < need the variable ground
-    log.trace("Perform buildIn predicate check {}".format(body))
+    log.trace("Perform builtIn predicate check {}".format(body))
     return True
 
 def checkFactExist(facts, fact):
     return fact in facts
 
 #get variable tuple for each goal
-def unifyBinding(p1, p2, binding, facts):
+def unifyBinding(p1, p2, binding, bindingFact, facts):
     if len(p1.terms) == len(p2.terms):
         # keys = (x for x in p1.terms)
         # print(keys)
@@ -480,7 +538,8 @@ def unifyBinding(p1, p2, binding, facts):
             log.debug("binding is {}".format(binding))
         elif isLowerCaseList(p2.terms):
             exist = p2.terms in [x.fact.terms for x in facts]
-            log.trace("Body is a ground clause, value is {}".format(exist))
+            bindingFact.append(exist)
+            log.debug("Body is a ground clause, value is {}".format(exist))
             return exist
 
     return True
@@ -513,5 +572,7 @@ if __name__ == '__main__':
     if len(sys.argv) != 2:
         print('Usage: python datalog.py datalog.cdl')
         sys.exit(-1)
+    start = time.time()
     main(sys.argv)
     Parser.yacc.out.close()
+    log.info("Total time: {} seconds".format(time.time()-start))
