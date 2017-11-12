@@ -18,32 +18,31 @@ subparsers = parser.add_subparsers(help='commands')
 
 naive_parser = subparsers.add_parser('naive', help='Bottom up evaluation with naive method search.')
 naive_parser.set_defaults(which='naive')
-
 semi_parser = subparsers.add_parser('semi-naive', help='Bottom up evaluation with semi-naive method search')
 semi_parser.set_defaults(which='semi-naive')
-
 parser.add_argument("file", help="Datalog program file")
 
 args = parser.parse_args()
 
+start = time.time()
+lastTime = 0
 
-
-RELEASE = False
+RELEASE = True
 TRACE_LEVEL = 39
 log = logging.getLogger('Datalog')
 
 logging.addLevelName(TRACE_LEVEL, "TRACE")
 
-def trace(self, message, *args, **kws):
+def trace(self, message, release=RELEASE, *args, **kws):
     # Yes, logger takes its '*args' as 'args'.
-    if RELEASE:
+    if release:
         return
     if self.isEnabledFor(TRACE_LEVEL):
         self._log(TRACE_LEVEL, message, args, **kws)
 
-def debug(self, message, *args, **kws):
+def debug(self, message, release=RELEASE, *args, **kws):
     # Yes, logger takes its '*args' as 'args'.
-    if RELEASE:
+    if release:
         return
     if self.isEnabledFor(TRACE_LEVEL):
         self._log(logging.DEBUG, message, args, **kws)
@@ -62,15 +61,24 @@ log.setLevel(logging.DEBUG)
 log.addHandler(fh)
 log.addHandler(ch)
 
+facts = []
+rules = []
+query = []
+
 def evaluationLog(l):
     if not RELEASE:
         Parser.yacc.out.write(l)
 
+def logTime(step):
+    global lastTime
+    current = time.time()
+    spend = current - start
+    log.trace("{} spend time:{} s, total time:{} s, total facts:{}".format(step, current-lastTime, spend, len(facts)), release=False)
+    lastTime = current
+
 def main(argv):
     log.trace("Start Parser File")
-    facts = []
-    rules = []
-    query = []
+
     parser = Parser.yacc.parser
     file = open(args.file, 'r')
     program = parser.parse(file.read())
@@ -139,8 +147,10 @@ def main(argv):
     #for each node in topological sort, implement of Extend dependency graph
     if not args.which == 'semi-naive':
         log.trace("Perform Naive evaluation method")
+
+    logTime("Parser and safety check")
     engine(dependsList, facts, rules)
-    # engine(dependsList2, facts, rules)
+    logTime("Perform program evaluation")
     log.debug("Finish Naive evaluation method")
     log.debug("Totally have {} facts.".format(len(facts)))
     for f in facts:
@@ -148,6 +158,7 @@ def main(argv):
 
     log.trace("Perform query by the facts")
     queryFromFacts(query, facts)
+    logTime("Perform query from fact")
 
 def checkProgramValidity(facts, rules, query):
     warning = False
@@ -286,7 +297,9 @@ def getRuleByNewFact(facts, semiRules):
             rules.add(r)
     return rules
 
+evaluateTimes = 1
 def engine(dependsList, facts, rules):
+    global evaluateTimes
     if args.which == 'semi-naive':
         log.trace("Perform Semi-Naive evaluation method")
         semiRules = builtRelativeRule(rules)
@@ -308,6 +321,8 @@ def engine(dependsList, facts, rules):
                 log.trace("Start rule {}".format(rule))
                 if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
                     newFacts = matchGoals(facts, rule)
+                    logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
+                    evaluateTimes += 1
                     if not newFacts:
                         log.trace("Move forward to next rule")
                         continue
@@ -372,8 +387,9 @@ def matchGoals(facts, rule):
             return [fact]
         else:
             return []
-
+    logTime("\t\tThe {} time perform unify binding".format(evaluateTimes))
     dict = globalIntersection(binding, rule.body)
+    logTime("\t\tThe {} time perform global intersection".format(evaluateTimes))
     return matchHeader(rule, binding, facts, dict)
 
 # ('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
@@ -620,7 +636,7 @@ def matchHeader(rule, binding, facts, dict):
         # for performance in possible:
         #     tuple = getVariableTuple(binding, term, performance)
         #     print("variable tuple is", tuple)
-
+    logTime("\t\tThe {} time perform match header".format(evaluateTimes))
     return newFacts
 
 def checkConstraint(dict, cons, verbose=True):
@@ -673,6 +689,7 @@ def checkFactExist(facts, fact):
 # get variable tuple for each goal
 # p1: fact, p2:body
 def unifyBinding(p1, p2, binding, facts):
+    global evaluateTimes
     if len(p1.terms) == len(p2.terms):
         # keys = (x for x in p1.terms)
         # print(keys)
