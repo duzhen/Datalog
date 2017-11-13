@@ -295,7 +295,7 @@ def getRuleByNewFact(facts, semiRules):
     for f in facts:
         for r in semiRules[f.fact.predicate]:
             rules.add(r)
-    return rules
+    return list(rules)
 
 evaluateTimes = 1
 def engine(dependsList, facts, rules):
