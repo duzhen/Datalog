@@ -18,6 +18,7 @@ class Fact(object):
         self.fact = fact
         self.fact.type = type
         self.type = type
+        self.record = set()
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):

@@ -3,9 +3,9 @@ parent(alice, bill).
 parent(bob, carol).
 parent(carol, dennis).
 parent(carol, david).
-age(alice, 30.00).
-age(bob, 40.500).
-weight(bob, 10056.7000).
+age(alice, 3000).
+age(bob, 40500).
+weight(bob, 100567000).
 
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- ancestor(X, Z), ancestor(Z, Y).

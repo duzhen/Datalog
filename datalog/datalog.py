@@ -231,7 +231,7 @@ def queryFromFacts(query, facts):
         builtInVariable, builtInBody = getBuiltInTerm(q.query)
         for p in q.query:
             if p.type == 'predicate':
-                newFacts = getFactsByPredicate(facts, p.predicate, len(p.terms))
+                newFacts = getFactsByPredicate(facts, p.predicate, termLength = len(p.terms))
                 if isLowerCaseList(p.terms):
                     r = False
                     for f in newFacts:
@@ -317,10 +317,12 @@ def engine(dependsList, facts, rules):
         while True:
             log.trace("Evaluation predicate <{}> in EDB".format(depend))
             newFacts = []
-            for rule in rules:
+            for i in range(0, len(rules)):
+            # for rule in rules:
+                rule = rules[i]
                 log.trace("Start rule {}".format(rule))
                 if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
-                    newFacts = matchGoals(facts, rule)
+                    newFacts = matchGoals(facts, rule, i)
                     logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
                     evaluateTimes += 1
                     if not newFacts:
@@ -347,10 +349,12 @@ def engine(dependsList, facts, rules):
     log.trace("Achieved least fix-point totally {} facts.".format(len(facts)))
 
 # match all the goals in the rule
-def matchGoals(facts, rule):
+def matchGoals(facts, rule, ruleIndex):
     binding = {}
     #for each goal in body
-    for body in rule.body:
+    for b in range(0, len(rule.body)):
+        body = rule.body[b]
+    # for body in rule.body:
         # print(body)
         # if body.builtin:
         #     do some thing
@@ -359,6 +363,8 @@ def matchGoals(facts, rule):
         # else not negated
         if body.type == 'predicate':
             log.trace("Start match predicate {}".format(body))
+
+            b_facts = getFactsByPredicate(facts, body.predicate, ruleIndex, b)
             if isLowerCaseList(body.terms):
                 exist = body.terms in [x.fact.terms for x in facts]
                 log.debug("Body is a ground clause, value is {}".format(exist))
@@ -367,7 +373,6 @@ def matchGoals(facts, rule):
                 else:
                     continue
 
-            b_facts = getFactsByPredicate(facts, body.predicate)
             log.debug("in body {} get fact {}".format(body.predicate, b_facts))
             log.trace("Find {} facts with this predicate".format(len(b_facts)))
             if len(b_facts) == 0:
@@ -375,6 +380,7 @@ def matchGoals(facts, rule):
                 return
             else:
                 for b_fact in b_facts:
+                    b_fact.record.add("{}.{}".format(ruleIndex, b))
                     if not unifyBinding(b_fact.fact, body, binding, facts):
                         continue
         # else:
@@ -684,7 +690,11 @@ def evaluateBuiltInPredicate(dict, builtin, verbose=True):
     return True
 
 def checkFactExist(facts, fact):
-    return fact in facts
+    for fs in facts:
+        if fs.fact == fact.fact:
+            return True
+    return False
+    # return fact in facts
 
 # get variable tuple for each goal
 # p1: fact, p2:body
@@ -749,11 +759,17 @@ def isLowerCase(c):
     return not c[0].isupper()
 
 #get the relative facts
-def getFactsByPredicate(facts, name, termLength=None):
-    if termLength:
-        return [x for x in facts if x is not None and x.fact.predicate == name and len(x.fact.terms) == termLength]
+def getFactsByPredicate(facts, name, ruleIndex=None, bodyIndex=None, termLength=None):
+    if ruleIndex and bodyIndex:
+        if termLength:
+            return [x for x in facts if not ("{}.{}".format(ruleIndex, bodyIndex)) in x.record and x is not None and x.fact.predicate == name and len(x.fact.terms) == termLength]
+        else:
+            return [x for x in facts if not ("{}.{}".format(ruleIndex, bodyIndex)) in x.record and x is not None and x.fact.predicate == name]
     else:
-        return [x for x in facts if x is not None and x.fact.predicate == name]
+        if termLength:
+            return [x for x in facts if x is not None and x.fact.predicate == name and len(x.fact.terms) == termLength]
+        else:
+            return [x for x in facts if x is not None and x.fact.predicate == name]
 
 if __name__ == '__main__':
     # if len(sys.argv) != 2:

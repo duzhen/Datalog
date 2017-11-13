@@ -37,7 +37,7 @@ t_OPERATOR = r'[!<>=](=)?'
 t_QUERY = r'\?'
 
 def t_CONSTANT(t):
-    r'[a-z0-9_][a-zA-Z_0-9.]*'
+    r'[a-z0-9_][a-zA-Z_0-9]*'
     # Check for reserved words
     t.type = reserved.get(t.value, 'CONSTANT')
     return t
