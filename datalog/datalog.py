@@ -296,6 +296,9 @@ def getRuleByNewFact(facts, semiRules):
         for r in semiRules[f.fact.predicate]:
             rules.add(r)
     return list(rules)
+def resetFacts():
+    for fact in facts:
+        fact.record.clear()
 
 evaluateTimes = 1
 def engine(dependsList, facts, rules):
@@ -317,6 +320,7 @@ def engine(dependsList, facts, rules):
         while True:
             log.trace("Evaluation predicate <{}> in EDB".format(depend))
             newFacts = []
+            resetFacts()
             for i in range(0, len(rules)):
             # for rule in rules:
                 rule = rules[i]
