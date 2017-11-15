@@ -27,7 +27,7 @@ args = parser.parse_args()
 start = time.time()
 lastTime = 0
 
-RELEASE = True
+RELEASE = False
 TRACE_LEVEL = 39
 log = logging.getLogger('Datalog')
 
@@ -293,8 +293,9 @@ def builtRelativeRule(rules):
 def getRuleByNewFact(facts, semiRules):
     rules = set()
     for f in facts:
-        for r in semiRules[f.fact.predicate]:
-            rules.add(r)
+        if f.fact.predicate in semiRules:
+            for r in semiRules[f.fact.predicate]:
+                rules.add(r)
     return list(rules)
 def resetFacts():
     for fact in facts:
@@ -384,9 +385,12 @@ def matchGoals(facts, rule, ruleIndex):
                 return
             else:
                 for b_fact in b_facts:
-                    b_fact.record.add("{}.{}".format(ruleIndex, b))
+                    # b_fact.record.add("{}.{}".format(ruleIndex, b))
                     if not unifyBinding(b_fact.fact, body, binding, facts):
                         continue
+        if len(binding) == 0:
+            log.debug("At least one body cannot unify from all the facts")
+            break
         # else:
         #     builtInBody.append(body)
         #     log.trace("Temp save one built-in predicate {}".format(body))
@@ -397,9 +401,9 @@ def matchGoals(facts, rule, ruleIndex):
             return [fact]
         else:
             return []
-    logTime("\t\tThe {} time perform unify binding".format(evaluateTimes))
-    dict = globalIntersection(binding, rule.body)
-    logTime("\t\tThe {} time perform global intersection".format(evaluateTimes))
+    logTime("\t\tThe {} time perform local unify binding".format(evaluateTimes))
+    dict = globalUnify(binding, rule.body)
+    logTime("\t\tThe {} time perform global unify binding".format(evaluateTimes))
     return matchHeader(rule, binding, facts, dict)
 
 # ('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
@@ -424,7 +428,7 @@ def filterBinding(binding, variable):
 #make a tuple match to a new match, like
 #('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
 # to {'X': {'c', 'a', 'd', 'b'}, 'Y': {'c', 'd', 'b', 'e'}}
-def globalIntersection(binding, body):
+def globalUnify(binding, body):
     variable = bindingToVariable(binding, body)
     filterBinding(binding, variable)
 
@@ -624,7 +628,7 @@ def filterDicByNewTermDic(dict, dictNew):
 def matchHeader(rule, binding, facts, dict):
     # variable = bindingToVariable(binding)
     # print("new variable", variable)
-    log.trace("start to match header {}".format(rule.head.predicate))
+    log.trace("start to generate new facts {}".format(rule.head.predicate))
     header = rule.head
     builtInVariable, builtInBody = getBuiltInTerm(rule.body)
     #now we get all the accept value for header
@@ -632,7 +636,8 @@ def matchHeader(rule, binding, facts, dict):
     for d in dict:
         for t in header.terms:
             if not t in d: # free variable in header
-                assert()
+                if not RELEASE:
+                    assert()
                 return newFacts
         if evaluateBuiltInPredicate(d, builtInBody):
             term = [list(d[x])[0] for x in header.terms]
@@ -646,7 +651,7 @@ def matchHeader(rule, binding, facts, dict):
         # for performance in possible:
         #     tuple = getVariableTuple(binding, term, performance)
         #     print("variable tuple is", tuple)
-    logTime("\t\tThe {} time perform match header".format(evaluateTimes))
+    logTime("\t\tThe {} time perform generate new facts".format(evaluateTimes))
     return newFacts
 
 def checkConstraint(dict, cons, verbose=True):
