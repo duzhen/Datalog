@@ -628,7 +628,7 @@ def filterDicByNewTermDic(dict, dictNew):
 def matchHeader(rule, binding, facts, dict):
     # variable = bindingToVariable(binding)
     # print("new variable", variable)
-    log.trace("start to generate new facts {}".format(rule.head.predicate))
+    log.trace("use GMP to generate new facts {}".format(rule.head.predicate))
     header = rule.head
     builtInVariable, builtInBody = getBuiltInTerm(rule.body)
     #now we get all the accept value for header
@@ -651,7 +651,7 @@ def matchHeader(rule, binding, facts, dict):
         # for performance in possible:
         #     tuple = getVariableTuple(binding, term, performance)
         #     print("variable tuple is", tuple)
-    logTime("\t\tThe {} time perform generate new facts".format(evaluateTimes))
+    logTime("\t\tThe {} time perform GMP".format(evaluateTimes))
     return newFacts
 
 def checkConstraint(dict, cons, verbose=True):
