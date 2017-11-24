@@ -1,8 +1,4 @@
 % generate problem of size 500
-reachable(X,Y) :- edge(X,Y).
-reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
-increasing(X,Y) :- edge(X,Y), lt(X,Y).
-increasing(X,Y) :- edge(X,Z), lt(X,Z), increasing(Z,Y).
 edge(0, 1).
 edge(1, 2).
 edge(2, 3).
@@ -504,3 +500,8 @@ edge(497, 498).
 edge(498, 499).
 edge(499, 500).
 edge(500, 0).
+
+reachable(X,Y) :- edge(X,Y).
+reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
+increasing(X,Y) :- edge(X,Y), lt(X,Y).
+increasing(X,Y) :- edge(X,Z), lt(X,Z), increasing(Z,Y).

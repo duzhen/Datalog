@@ -1,8 +1,4 @@
 % generate problem of size 100
-reachable(X,Y) :- edge(X,Y).
-reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
-increasing(X,Y) :- edge(X,Y), lt(X,Y).
-increasing(X,Y) :- edge(X,Z), lt(X,Z), increasing(Z,Y).
 edge(0, 1).
 edge(1, 2).
 edge(2, 3).
@@ -104,3 +100,8 @@ edge(97, 98).
 edge(98, 99).
 edge(99, 100).
 edge(100, 0).
+
+reachable(X,Y) :- edge(X,Y).
+reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
+increasing(X,Y) :- edge(X,Y), lt(X,Y).
+increasing(X,Y) :- edge(X,Z), lt(X,Z), increasing(Z,Y).

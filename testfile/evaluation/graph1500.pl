@@ -1,6 +1,4 @@
 % generate problem of size 1500
-reachable(X,Y) :- edge(X,Y).
-reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
 edge(0, 1).
 edge(1, 2).
 edge(2, 3).
@@ -1502,3 +1500,6 @@ edge(1497, 1498).
 edge(1498, 1499).
 edge(1499, 1500).
 edge(1500, 0).
+
+reachable(X,Y) :- edge(X,Y).
+reachable(X,Y) :- edge(X,Z), reachable(Z,Y).

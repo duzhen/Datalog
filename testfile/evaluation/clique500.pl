@@ -1,7 +1,4 @@
 % generate problem of size 500
-reachable(X,Y) :- edge(X,Y).
-reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
-same_clique(X,Y) :- reachable(X,Y), reachable(Y,X).
 edge(0, 1).
 edge(1, 2).
 edge(2, 3).
@@ -503,3 +500,7 @@ edge(497, 498).
 edge(498, 499).
 edge(499, 500).
 edge(500, 0).
+
+reachable(X,Y) :- edge(X,Y).
+reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
+same_clique(X,Y) :- reachable(X,Y), reachable(Y,X).
