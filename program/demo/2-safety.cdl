@@ -5,18 +5,18 @@ edge(b, d).
 edge(c, d).
 edge(X, e).
 edge(a, a).
-edge(b, a).
+edge(b, b).
 not edge(f, e).
 
 path(X, Y) :- edge(X, Y), not edge(X, X), not edge(Y, Y).
 path(X, Y) :- path(X, Z), path(Z, Y).
-path(X, Y) :- edge(X, Y).%, X==Y.
+path(X, Y) :- edge(X, Y), X==Z.
 
-%path(X, X) :- not edge(X, X).
+path(X, Z) :- not edge(X, X).
 %path(X, Y) :- path(X, Z), edge(Z, Y).
 
 
 path(a, b)?
 path(X, X), X != a?
-path(a, X), path(X, d)?
+%path(a, X), path(X, d)?
 not path(X, e)?

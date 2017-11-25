@@ -174,6 +174,21 @@ def checkProgramValidity(facts, rules, query):
             warning = True
 
     for rule in rules.copy():
+        bList = []
+        pList = []
+        for s in [x.terms for x in rule.body if x.type == 'predicate']:
+            bList.extend(s)
+        for s in [[x.termX, x.termY] for x in rule.body if x.type == 'constraint']:
+            if isUpperCase(s):
+                pList.extend(s)
+
+        for p in pList:
+            if not p in bList:
+                rules.remove(rule)
+                evaluationLog("\nWarning! Built-ins is not safety\n{}\n".format(str(rule)))
+                log.warning("Warning! Built-ins is not safety")
+                warning = True
+                break
         if isLowerCaseList(rule.head.terms):
             break
         for t in rule.head.terms:
