@@ -346,7 +346,7 @@ def queryFromFacts(query, facts):
         # log.trace(answer)
         evaluationLog("{}\n".format(answer))
         print(answer)
-
+@deprecated('not needed')
 def builtRelativeRule(rules):
     semiRules = {}
     for rule in rules:
@@ -423,8 +423,8 @@ def engine(dependsList, facts, rules):
     global evaluateTimes
     if args.which == 'semi-naive':
         log.t("Perform semi-naive evaluation method")
-        semiRules = builtRelativeRule(rules)
-        rules = getRuleByNewFact(facts, semiRules)
+        # semiRules = builtRelativeRule(rules)
+        # rules = getRuleByNewFact(facts, semiRules)
     for i in range(0, len(dependsList)):
         depend = dependsList[i]
         # if not depend in [f.fact.predicate for f in facts]:
@@ -474,7 +474,7 @@ def engine(dependsList, facts, rules):
             facts.extend(newFacts)
             if args.which == 'semi-naive':
                 # semi-naive part
-                rules = getRuleByNewFact(facts, semiRules)
+                # rules = getRuleByNewFact(facts, semiRules)
                 log.trace("Semi-Naive derive this rules {}".format(rules))
     log.t("Achieved least fix-point, total {} facts.".format(len(facts)))
 
