@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Parser.yacc
 from Parser.model import Fact, Predicate
 
-parser = argparse.ArgumentParser(description="Datalog bottom-up evaluation implement by Python, support Naive, Semi-Naive, Built-Ins and Negation")
+parser = argparse.ArgumentParser(description="Datalog bottom-up evaluation implement by Python, support Naive, Semi-Naive, Built-Ins and Stratified Negation")
 parser.add_argument("-p", action='store_true', dest="verbose", default=False, help="Prints parser result to file.")
 parser.add_argument("-c", action='store_true', dest="command", default=False, help="Command to query.")
 parser.add_argument("-t", action='store_true', dest="trace", default=False, help="Trace evaluation progress.")
@@ -127,6 +127,7 @@ def main(argv):
     for f in facts:
         evaluationLog(str(f) + "\n")
 
+    negated = False
     evaluationLog("\nRULE:\n")
     for r in rules:
         evaluationLog(str(r) + "\n")
@@ -135,6 +136,7 @@ def main(argv):
                 weight = 1
                 if body.isNegated:
                     weight = 0
+                    negated = True
                 edge = (body.predicate, r.head.predicate)
                 data = G2.get_edge_data(*edge)
                 if data:
@@ -153,31 +155,55 @@ def main(argv):
 
     evaluationLog("\n{}\n".format("\nNEW FACTS:\n"))
     #check stratified
-    cycle = list(nx.simple_cycles(G2))
-    if not len(cycle) == 0:
-        if not checkStratified(G2, cycle):
+    cycle2 = list(nx.simple_cycles(G2))
+    if not len(cycle2) == 0:
+        if not checkStratified(G2, cycle2):
             log.error("Datalog program do not satisfy the stratified safety")
             return
-    depends = nx.topological_sort(G)
-    # depends2= nx.topological_sort(G2)
-    dependsList = list(depends)
-    # dependsList2 = list(depends2)
-    log.trace('Topological sort: {}'.format(dependsList))
-    if len(dependsList) == 0:
-        log.trace("No valid rule to do the evaluation")
-        return
-    # if len(dependsList2) != 0:
-    #     log.trace('cut the cycle graph, get topological sort: {}'.format(dependsList2))
-    #Naive part
-    #for each node in topological sort, implement of Extend dependency graph
-    if not args.which == 'semi-naive':
-        log.t("Perform naive evaluation method")
 
-    logTime("Parser and safety check")
-    engine(dependsList, facts, rules)
-    logTime("Perform program evaluation")
-    if not args.which == 'semi-naive':
-        log.debug("Finish Naive evaluation method")
+    cycle = list(nx.simple_cycles(G))
+    if negated:
+        print("force use semi-naive evaluation to process negation")
+        depends = nx.topological_sort(G)
+        # depends2= nx.topological_sort(G2)
+        dependsList = list(depends)
+        # dependsList2 = list(depends2)
+        log.trace('Topological sort: {}'.format(dependsList))
+        if len(dependsList) == 0:
+            log.trace("No valid rule to do the evaluation")
+            return
+        # if len(dependsList2) != 0:
+        #     log.trace('cut the cycle graph, get topological sort: {}'.format(dependsList2))
+        # Naive part
+        # for each node in topological sort, implement of Extend dependency graph
+        logTime("Parser and safety check")
+        engine(dependsList, facts, rules)
+        logTime("Perform program evaluation")
+    elif not len(cycle) == 0:
+        print("force use naive evaluation to process a cycle EDG")
+        naive_engine(facts, rules)
+    else:
+        depends = nx.topological_sort(G)
+        # depends2= nx.topological_sort(G2)
+        dependsList = list(depends)
+        # dependsList2 = list(depends2)
+        log.trace('Topological sort: {}'.format(dependsList))
+        if len(dependsList) == 0:
+            log.trace("No valid rule to do the evaluation")
+            return
+        # if len(dependsList2) != 0:
+        #     log.trace('cut the cycle graph, get topological sort: {}'.format(dependsList2))
+        #Naive part
+        #for each node in topological sort, implement of Extend dependency graph
+        logTime("Parser and safety check")
+        if not args.which == 'semi-naive':
+            log.t("Perform naive evaluation method")
+            naive_engine(facts, rules)
+        else:
+            engine(dependsList, facts, rules)
+        logTime("Perform program evaluation")
+        if not args.which == 'semi-naive':
+            log.debug("Finish Naive evaluation method")
     log.debug("Totally have {} facts.".format(len(facts)))
     for f in facts:
         log.trace(f)
@@ -349,6 +375,48 @@ def getRuleByNewFact(facts, semiRules):
 def resetFacts():
     for fact in facts:
         fact.record.clear()
+
+def naive_engine(facts, rules):
+    log.t("perform naive valuation")
+    evaluateTimes = 1
+    while True:
+        newFacts = []
+        resetFacts()
+        for i in range(0, len(rules)):
+        # for rule in rules:
+            rule = rules[i]
+            log.trace("Inference rule {}".format(rule.head))
+            # if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
+            log.t("Inference rule {}".format(rule.head))
+            newFacts = matchGoals(facts, rule, i)
+            logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
+            evaluateTimes += 1
+            if not newFacts:
+                log.trace("Nothing get, return")
+                continue
+            log.t("Get {} new facts".format(len(newFacts)))
+            if not len(newFacts) == 0:
+                if args.which == 'semi-naive':
+                    log.t("semi-Naive restart evaluation")
+                    if TRACE:
+                        print("\t----------------------------------------------------------------")
+                else:
+                    log.t("Naive restart evaluation")
+                    if TRACE:
+                        print("\t----------------------------------------------------------------")
+                break
+            # else:
+            #     log.trace("Skip this rule, no predicate in this rule")
+        if not newFacts or len(newFacts) == 0:
+            log.t("No more new facts, return")
+            break
+        log.debug("New facts:")
+        for f in newFacts:
+            evaluationLog("*{}\n".format(f))
+            log.debug("******{}".format(f))
+        facts.extend(newFacts)
+    log.t("Achieved least fix-point, total {} facts.".format(len(facts)))
+
 
 evaluateTimes = 1
 def engine(dependsList, facts, rules):
