@@ -1,0 +1,32 @@
+e(a,b,1).
+e(b,c,1).
+%e(a,c,1).
+
+
+
+e(e,h,1).
+%e(d,h,1).
+
+
+plus(2, 1).
+plus(3, 2).
+plus(4, 3).
+plus(5, 4).
+plus(6, 5).
+plus(7, 6).
+plus(8, 7).
+plus(9, 8).
+plus(10, 9).
+
+p(X, Y, N) :- e(X, Y, N).
+%p(X, Y, N) :- p(X, Z, N1), p(Z, Y, N2), c(N, N1, N2).
+p(X, Y, N) :- e(X, Z, N0), p(Z, Y, N1), plus(N, N1).
+%p(X, Y, N) :- e(X, Z, 10), p(X, Z, N0), e(Z, Y, N1), plus(N, N0).
+
+
+
+%p(X, Y, N) :- p(X, Y, N0), e(X, Y, N1), plus(N, N0), N0!=1.
+%p(X, Y, N) :- p(X, Z, N1), p(Z, Y, N2), plus(N, N0).
+%p(X, Y, N) :- p(X, Z, N1), p(Z, Y, N2), c(N0, N1, N2), p(X, Z1, N3), p(Z1, Y, N4), c(N5, N3, N4), c1(N, N0, N5).
+
+p(a, c, N)?

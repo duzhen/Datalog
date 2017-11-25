@@ -13,6 +13,8 @@ import Parser.yacc
 from Parser.model import Fact, Predicate
 
 parser = argparse.ArgumentParser(description="Datalog bottom-up interpreter by Python, support Naive, Semi-Naive, Built-In predicate, stratified, simple negation query")
+parser.add_argument("-p", action='store_true', dest="verbose", default=False, help="Prints the result of parser to file.")
+parser.add_argument("-c", action='store_true', dest="command", default=False, help="Command to Query.")
 
 subparsers = parser.add_subparsers(help='commands')
 
@@ -27,7 +29,7 @@ args = parser.parse_args()
 start = time.time()
 lastTime = 0
 
-RELEASE = False
+RELEASE = True
 TRACE_LEVEL = 39
 log = logging.getLogger('Datalog')
 
@@ -66,10 +68,12 @@ rules = []
 query = []
 
 def evaluationLog(l):
-    if not RELEASE:
+    if not RELEASE or args.verbose:
         Parser.yacc.out.write(l)
 
 def logTime(step):
+    if RELEASE:
+        return
     global lastTime
     current = time.time()
     spend = current - start
@@ -200,11 +204,11 @@ def checkProgramValidity(facts, rules, query):
 
     if len(Parser.yacc.errorList) == 0:
         if warning:
-            log.trace("Parser success, but warning in evaluation.log")
+            log.trace("Parser success, see warning in p.res")
         else:
             log.trace("Parser success, no error found")
     else:
-        log.trace("Parser failed, error save in evaluation.log")
+        log.trace("Parser failed, see error in p.res")
 
     log.debug("Fact:{}".format(facts))
     log.debug("Rule:{}".format(rules))
@@ -788,3 +792,17 @@ if __name__ == '__main__':
     main(sys.argv)
     Parser.yacc.out.close()
     log.info("Total time: {} seconds".format(time.time()-start))
+    while True:
+        args.verbose = False
+        try:
+            s = input('query > ')
+        except EOFError:
+            break
+        if not s: continue
+        query = []
+        parser = Parser.yacc.parser
+        program = parser.parse(s)
+        for p in program:
+            if p.type == 'query':
+                query.append(p)
+        queryFromFacts(query, facts)

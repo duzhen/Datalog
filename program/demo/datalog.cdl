@@ -1,0 +1,22 @@
+edge(a, b).
+edge(a, k).
+edge(a, c).
+edge(b, d).
+edge(c, d).
+edge(d, e).
+edge(a, a).
+edge(b, a).
+not edge(f, e).
+
+path(X, Y) :- edge(X, Y), not edge(X, X), not edge(Y, Y).
+path(X, Y) :- path(X, Z), path(Z, Y).
+path(X, Y) :- edge(X, Y).%, X==Y.
+
+%path(X, X) :- not edge(X, X).
+%path(X, Y) :- path(X, Z), edge(Z, Y).
+
+
+path(a, b)?
+path(X, X), X != a?
+path(a, X), path(X, d)?
+path(X, e)?
