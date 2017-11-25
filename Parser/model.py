@@ -33,7 +33,7 @@ class Fact(object):
         return "%r" % (self.__dict__)
 
 class Predicate(object):
-    def __init__(self, name="", terms=[], isNegated="", type = "predicate"):
+    def __init__(self, name="", terms=[], isNegated=False, type = "predicate"):
         self.predicate = name
         self.terms = terms
         self.isNegated = isNegated

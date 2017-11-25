@@ -1,0 +1,11 @@
+edge(0, 1).
+edge(1, 2).
+edge(1, 1).
+
+pathP(X,Y) :- edge(X,Z), edge(Z,Y).
+path(X,Y) :- edge(X,Z), edge(Z,Y), not edge(X,X).
+path1(X,Y) :- edge(X,Z), edge(Z,Y), not edge(1,X).
+
+pathP(X, Y)?
+path(X, Y)?
+path1(X, Y)?

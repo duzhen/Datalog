@@ -10,7 +10,7 @@ path(X, Y) :- edge(X, Y), X>a.
 
 pathA(X, Y) :- edge(X, Y), X==Y.
 
-pathB(X, Y) :- edge(X, Y), X!=Y.
+pathB(X, Y) :- edge(X, a), edge(a, Y), X!=Y.
 
 path(X, Y)?
 path(X, Y), X==a?

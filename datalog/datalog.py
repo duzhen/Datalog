@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Parser.yacc
 from Parser.model import Fact, Predicate
 
-parser = argparse.ArgumentParser(description="Datalog bottom-up evaluation implement by Python, support Naive, Semi-Naive, Built-Ins, stratified and negation")
+parser = argparse.ArgumentParser(description="Datalog bottom-up evaluation implement by Python, support Naive, Semi-Naive, Built-Ins and Negation")
 parser.add_argument("-p", action='store_true', dest="verbose", default=False, help="Prints parser result to file.")
 parser.add_argument("-c", action='store_true', dest="command", default=False, help="Command to query.")
 parser.add_argument("-t", action='store_true', dest="trace", default=False, help="Trace evaluation progress.")
@@ -202,14 +202,17 @@ def checkProgramValidity(facts, rules, query):
         for s in [x.termY for x in rule.body if x.type == 'constraint']:
             if isUpperCase(s):
                 pList.extend(s)
-
+        remove = False
         for p in pList:
             if not p in bList:
                 rules.remove(rule)
                 evaluationLog("\nWarning! Built-ins is not safety\n{}\n".format(str(rule)))
                 log.warning("Warning! Built-ins is not safety")
                 warning = True
+                remove = True
                 break
+        if remove:
+            continue
         if isLowerCaseList(rule.head.terms):
             break
         for t in rule.head.terms:
@@ -361,7 +364,7 @@ def engine(dependsList, facts, rules):
         #         continue
     # for depend in dependsList:
         while True:
-            log.trace("Evaluation predicate <{}> in EDB".format(depend))
+            log.t("Evaluation predicate <{}> in EDB".format(depend))
             newFacts = []
             resetFacts()
             for i in range(0, len(rules)):
@@ -374,7 +377,7 @@ def engine(dependsList, facts, rules):
                     logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
                     evaluateTimes += 1
                     if not newFacts:
-                        log.t("Nothing get, return")
+                        log.trace("Nothing get, return")
                         continue
                     log.t("Get {} new facts".format(len(newFacts)))
                     if not len(newFacts) == 0:
@@ -390,7 +393,7 @@ def engine(dependsList, facts, rules):
                 else:
                     log.trace("Skip this rule, no predicate in this rule")
             if not newFacts or len(newFacts) == 0:
-                log.trace("Get 0 new facts, finish and move forward to next node")
+                log.t("No more new facts, return")
                 break
             log.debug("New facts:")
             for f in newFacts:
@@ -405,6 +408,32 @@ def engine(dependsList, facts, rules):
 
 # match all the goals in the rule
 def matchGoals(facts, rule, ruleIndex):
+    # perform negation check first
+    n_facts = facts.copy()
+    for nb in rule.body:
+        if nb.type == 'predicate' and nb.isNegated:
+            log.t("process negation predicate {}".format(nb))
+            b_facts = getFactsByPredicate(n_facts, nb.predicate)
+            if isLowerCaseList(nb.terms):
+                if nb.terms in [x.fact.terms for x in b_facts]:
+                    return
+            else:
+                for b_fact in b_facts:
+                    if len(b_fact.fact.terms) == len(nb.terms):
+                        termsKey = nb.terms.copy()
+                        termsValue = b_fact.fact.terms.copy()
+                        for i in range(0, len(nb.terms)):
+                            if isLowerCase(nb.terms[i]):
+                                if b_fact.fact.terms[i] != nb.terms[i]:
+                                    break
+                                else:
+                                    termsKey.remove(nb.terms[i])
+                                    termsValue.remove(b_fact.fact.terms[i])
+                            if i == len(nb.terms)-1:
+                                if checkUnifiable(tuple(termsKey), termsValue):
+                                    log.t("  drop fact {}".format(b_fact))
+                                    n_facts.remove(b_fact)
+
     binding = {}
     #for each goal in body
     for b in range(0, len(rule.body)):
@@ -416,14 +445,16 @@ def matchGoals(facts, rule, ruleIndex):
         # if body is negated:
         #     do some thing
         # else not negated
-        if body.type == 'predicate':
+        if body.type == 'predicate' and not body.isNegated:
             log.trace("Start match predicate {}".format(body))
 
-            b_facts = getFactsByPredicate(facts, body.predicate, ruleIndex, b)
+            b_facts = getFactsByPredicate(n_facts, body.predicate, ruleIndex, b)
             if isLowerCaseList(body.terms):
-                exist = body.terms in [x.fact.terms for x in facts]
+                exist = body.terms in [x.fact.terms for x in b_facts]
                 log.debug("Body is a ground clause, value is {}".format(exist))
-                if not exist:
+                if body.isNegated:
+                    log.t("process negation predicate {}".format(body))
+                if exist == body.isNegated:
                     return
                 else:
                     continue
