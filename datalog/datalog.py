@@ -15,6 +15,8 @@ from Parser.model import Fact, Predicate
 parser = argparse.ArgumentParser(description="Datalog bottom-up evaluation implement by Python, support Naive, Semi-Naive, Built-Ins, stratified and negation")
 parser.add_argument("-p", action='store_true', dest="verbose", default=False, help="Prints parser result to file.")
 parser.add_argument("-c", action='store_true', dest="command", default=False, help="Command to query.")
+parser.add_argument("-t", action='store_true', dest="trace", default=False, help="Trace evaluation progress.")
+parser.add_argument("-x", action='store_true', dest="optimize", default=False, help="Turn on optimization mode.")
 
 subparsers = parser.add_subparsers(help='commands')
 
@@ -25,15 +27,26 @@ semi_parser.set_defaults(which='semi-naive')
 parser.add_argument("file", help="Datalog program file")
 
 args = parser.parse_args()
+TRACE = args.trace
 
 start = time.time()
 lastTime = 0
 
 RELEASE = True
-TRACE_LEVEL = 39
+TRACE_LEVEL = 38
+T_LEVEL = 39
+
 log = logging.getLogger('Datalog')
 
 logging.addLevelName(TRACE_LEVEL, "TRACE")
+logging.addLevelName(T_LEVEL, "TRACE")
+
+def t(self, message, *args, **kws):
+    # Yes, logger takes its '*args' as 'args'.
+    if not TRACE:
+        return
+    if self.isEnabledFor(T_LEVEL):
+        self._log(T_LEVEL, message, args, **kws)
 
 def trace(self, message, release=RELEASE, *args, **kws):
     # Yes, logger takes its '*args' as 'args'.
@@ -51,12 +64,16 @@ def debug(self, message, release=RELEASE, *args, **kws):
 
 logging.Logger.trace = trace
 logging.Logger.debug = debug
+logging.Logger.t = t
 
 fh = logging.FileHandler('trace.log')
 fh.setLevel(TRACE_LEVEL)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('[%(levelname)s] >> %(message)s << %(funcName)s() %(asctime)s')
+if RELEASE:
+    formatter = logging.Formatter('[%(levelname)s] >> %(message)s <<')
+else:
+    formatter = logging.Formatter('[%(levelname)s] >> %(message)s << %(funcName)s() %(asctime)s')
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 log.setLevel(logging.DEBUG)
@@ -150,12 +167,13 @@ def main(argv):
     #Naive part
     #for each node in topological sort, implement of Extend dependency graph
     if not args.which == 'semi-naive':
-        log.trace("Perform Naive evaluation method")
+        log.t("Perform naive evaluation method")
 
     logTime("Parser and safety check")
     engine(dependsList, facts, rules)
     logTime("Perform program evaluation")
-    log.debug("Finish Naive evaluation method")
+    if not args.which == 'semi-naive':
+        log.debug("Finish Naive evaluation method")
     log.debug("Totally have {} facts.".format(len(facts)))
     for f in facts:
         log.trace(f)
@@ -319,6 +337,8 @@ def getRuleByNewFact(facts, semiRules):
             for r in semiRules[f.fact.predicate]:
                 rules.add(r)
     return list(rules)
+
+#record fact has processed by specific rule
 def resetFacts():
     for fact in facts:
         fact.record.clear()
@@ -327,7 +347,7 @@ evaluateTimes = 1
 def engine(dependsList, facts, rules):
     global evaluateTimes
     if args.which == 'semi-naive':
-        log.trace("Perform Semi-Naive evaluation method")
+        log.t("Perform semi-naive evaluation method")
         semiRules = builtRelativeRule(rules)
         rules = getRuleByNewFact(facts, semiRules)
     for i in range(0, len(dependsList)):
@@ -347,17 +367,25 @@ def engine(dependsList, facts, rules):
             for i in range(0, len(rules)):
             # for rule in rules:
                 rule = rules[i]
-                log.trace("Start rule {}".format(rule))
+                log.trace("Inference rule {}".format(rule.head))
                 if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
+                    log.t("Inference rule {}".format(rule.head))
                     newFacts = matchGoals(facts, rule, i)
                     logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
                     evaluateTimes += 1
                     if not newFacts:
-                        log.trace("Move forward to next rule")
+                        log.t("Nothing get, return")
                         continue
-                    log.trace("Get {} new facts".format(len(newFacts)))
+                    log.t("Get {} new facts".format(len(newFacts)))
                     if not len(newFacts) == 0:
-                        log.trace("Restart Evaluation from beginning")
+                        if args.which == 'semi-naive':
+                            log.t("semi-Naive restart evaluation")
+                            if TRACE:
+                                print("\t----------------------------------------------------------------")
+                        else:
+                            log.t("Naive restart evaluation")
+                            if TRACE:
+                                print("\t----------------------------------------------------------------")
                         break
                 else:
                     log.trace("Skip this rule, no predicate in this rule")
@@ -373,7 +401,7 @@ def engine(dependsList, facts, rules):
                 # semi-naive part
                 rules = getRuleByNewFact(facts, semiRules)
                 log.trace("Semi-Naive derive this rules {}".format(rules))
-    log.trace("Achieved least fix-point totally {} facts.".format(len(facts)))
+    log.t("Achieved least fix-point, total {} facts.".format(len(facts)))
 
 # match all the goals in the rule
 def matchGoals(facts, rule, ruleIndex):
@@ -407,7 +435,8 @@ def matchGoals(facts, rule, ruleIndex):
                 return
             else:
                 for b_fact in b_facts:
-                    # b_fact.record.add("{}.{}".format(ruleIndex, b))
+                    if args.optimize:
+                        b_fact.record.add("{}.{}".format(ruleIndex, b))
                     if not unifyBinding(b_fact.fact, body, binding, facts):
                         continue
         if len(binding) == 0:
@@ -419,7 +448,7 @@ def matchGoals(facts, rule, ruleIndex):
     if len(binding) == 0 and isLowerCaseList(rule.head.terms):
         fact = Fact(rule.head)
         if not (checkFactExist(facts, fact)):
-            log.trace("******Get new fact {}".format(fact))
+            log.t("******Get new fact {}".format(fact))
             return [fact]
         else:
             return []
@@ -437,7 +466,7 @@ def matchGoals(facts, rule, ruleIndex):
 # for example (X, Y) = (1,2), (2,3), (Y,Z) = (2,4).
 # after intersection, Y = 2, 2 in X removed, then remove (2,3)
 def filterBinding(binding, variable):
-    log.trace("Perform a bit optimization, remove unsatisfied tuple value")
+    log.t("perform optimization, filter substitution not in ground intersection set")
     for value in binding.values(): # each predicate as key
         for key in value.keys(): #('X', 'Y')
             for l in value[key].copy(): #['a', 'b']
@@ -452,13 +481,14 @@ def filterBinding(binding, variable):
 # to {'X': {'c', 'a', 'd', 'b'}, 'Y': {'c', 'd', 'b', 'e'}}
 def globalUnify(binding, body):
     variable = bindingToVariable(binding, body)
-    filterBinding(binding, variable)
+    if args.optimize:
+        filterBinding(binding, variable)
 
     log.trace("evaluate built-in predicate before do global intersection")
     builtInVariable, builtInBody = getBuiltInTerm(body)
     dict = []
     # for term in ['X', 'Y']:
-    log.trace("Perform global intersection")
+    log.t("global unification")
     for value in binding.values():
         for key, v in value.items():
             dictNew = getDicFromTuplesByTerm(key, v, builtInVariable, builtInBody)
@@ -496,11 +526,15 @@ def checkUnifiable(key, value):
         dict[key[i]].add(value[i])
     for v in dict.values():
         if not len(v) == 1:
+            log.t("  unify local substitution {},{} -> nonunifiable".format(key, value))
             return False
+    log.t("  unify local substitution {},{} -> unifiable".format(key, value))
     return True
 
 
 def bindingToVariable(binding, body):
+    log.t("get possible fact set {}".format(binding))
+    log.t("local unification")
     variable = {}
     # print(binding.values())
     negativeValue = []
@@ -519,11 +553,13 @@ def bindingToVariable(binding, body):
     for bindingKey, value in binding.items():
         for key, keyValue in value.items():
             localVariable = {}
+            for v in value[key].copy():
+                if not checkUnifiable(key, v):
+                    value[key].remove(v)
             for i in range(0, len(key)): #(X, X)
                 listNew = []
                 for v in value[key]:
-                    if checkUnifiable(key, v):
-                        listNew.append(v[i])
+                    listNew.append(v[i])
                     # print(listNew)
                 list = listNew
                 if key[i] in variable.keys():
@@ -620,7 +656,7 @@ def getDicFromTuplesByTerm(key, value, builtInVariable, builtInBody):
         dic = {}
         for i in range(0, len(key)):
             dic[key[i]] = set([v[i]])
-        if set(key) >= builtInVariable:
+        if set(key) >= builtInVariable and len(builtInVariable) > 0:
             if not evaluateBuiltInPredicate(dic, builtInBody):
                 continue
         dictList.append(dic)
@@ -639,7 +675,7 @@ def checkIfDicSetUnifiable(dict):
 # but, (X, Y) = (1, 4) (Y, Z) = (2, 3) ==> (X, Y, Z) = (1, {2,4}, 3), invalid
 def filterDicByNewTermDic(dict, dictNew):
     # print("original dict and new dict", dict, dictNew)
-    log.trace("Merge two dictionary and do filter")
+    log.trace("unify two substitution {},{}".format(dict, dictNew))
     if len(dict) == 0:
         dict.extend(dictNew)
         return
@@ -647,9 +683,13 @@ def filterDicByNewTermDic(dict, dictNew):
     for dic in dict:
         for d in dictNew:
             dicFilter = dic.copy()
+            logdic = dicFilter.copy()
             newDic = mergeTwoDict(dicFilter, d)
             if newDic:
+                log.t("  most general unifier {},{} -> unifiable".format(logdic, d))
                 filterList.append(dicFilter)
+            else:
+                log.t("  most general unifier {},{} -> nonunifiable".format(logdic, d))
     log.trace("Check satisfy for each dictionary, if len(value) > 1, then remove it")
     list = filterList.copy()
     for f in list:
@@ -679,7 +719,7 @@ def matchHeader(rule, binding, facts, dict):
             # print("get terms", term)
             fact = Fact(Predicate(header.predicate, term, header.isNegated))
             if not (checkFactExist(facts, fact) or checkFactExist(newFacts, fact)):
-                log.trace("******Get new fact {}".format(fact))
+                log.t("******Get new fact {}".format(fact))
                 newFacts.append(fact)
         # possible = getVariablePossibleValue(variable, term)
         # print("possible value for", term, possible)
@@ -729,13 +769,14 @@ def evaluateBuiltInPredicate(dict, builtin, verbose=True):
     # X==Y, can precess directly, <=, >= >, < need the variable ground
     # builtInBody = []
     if verbose:
-        log.trace("Start evaluate built-in predicate, value {}, builtin {}".format(dict, builtin))
+        if len(builtin) > 0:
+            log.t("derive built-ins, value {}, builtin {}".format(dict, builtin))
     for body in builtin:
         if body.type == 'constraint':
             # builtInBody.append(body)
             if not checkConstraint(dict, body, verbose):
                 if verbose:
-                    log.debug("{} does not satisfy builtIn predicate".format(dict))
+                    log.t("{} does not satisfy built-ins".format(dict))
                 return False
     return True
 
