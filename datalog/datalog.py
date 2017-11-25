@@ -69,14 +69,18 @@ logging.Logger.t = t
 fh = logging.FileHandler('trace.log')
 fh.setLevel(TRACE_LEVEL)
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+
 if RELEASE:
+    ch.setLevel(T_LEVEL)
     formatter = logging.Formatter('[%(levelname)s] >> %(message)s <<')
+    log.setLevel(T_LEVEL)
 else:
+    ch.setLevel(logging.DEBUG)
     formatter = logging.Formatter('[%(levelname)s] >> %(message)s << %(funcName)s() %(asctime)s')
+    log.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
-log.setLevel(logging.DEBUG)
+
 log.addHandler(fh)
 log.addHandler(ch)
 
@@ -196,10 +200,10 @@ def checkProgramValidity(facts, rules, query):
         pList = []
         for s in [x.terms for x in rule.body if x.type == 'predicate']:
             bList.extend(s)
-        for s in [x.termX for x in rule.body if x.type == 'constraint']:
+        for s in [[x.termX] for x in rule.body if x.type == 'constraint']:
             if isUpperCase(s):
                 pList.extend(s)
-        for s in [x.termY for x in rule.body if x.type == 'constraint']:
+        for s in [[x.termY] for x in rule.body if x.type == 'constraint']:
             if isUpperCase(s):
                 pList.extend(s)
         remove = False
@@ -900,7 +904,7 @@ if __name__ == '__main__':
     start = time.time()
     main(sys.argv)
     Parser.yacc.out.close()
-    log.info("Total time: {} seconds".format(time.time()-start))
+    print("Total time: {} seconds".format(time.time()-start))
     if args.command:
         while True:
             args.verbose = False
