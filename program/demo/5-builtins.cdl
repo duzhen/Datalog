@@ -1,0 +1,19 @@
+edge(a, b).
+edge(b, c).
+edge(c, a).
+
+edge(a, a).
+edge(b, b).
+edge(c, c).
+
+path(X, Y) :- edge(X, Y), X>a.
+
+pathA(X, Y) :- edge(X, Y), X==Y.
+
+pathB(X, Y) :- edge(X, Y), X!=Y.
+
+path(X, Y)?
+path(X, Y), X==a?
+
+pathA(X, Y)?
+pathB(X, Y)?

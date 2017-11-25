@@ -178,7 +178,10 @@ def checkProgramValidity(facts, rules, query):
         pList = []
         for s in [x.terms for x in rule.body if x.type == 'predicate']:
             bList.extend(s)
-        for s in [[x.termX, x.termY] for x in rule.body if x.type == 'constraint']:
+        for s in [x.termX for x in rule.body if x.type == 'constraint']:
+            if isUpperCase(s):
+                pList.extend(s)
+        for s in [x.termY for x in rule.body if x.type == 'constraint']:
             if isUpperCase(s):
                 pList.extend(s)
 
