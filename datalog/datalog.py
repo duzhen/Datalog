@@ -12,9 +12,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import Parser.yacc
 from Parser.model import Fact, Predicate
 
-parser = argparse.ArgumentParser(description="Datalog bottom-up interpreter by Python, support Naive, Semi-Naive, Built-In predicate, stratified, simple negation query")
-parser.add_argument("-p", action='store_true', dest="verbose", default=False, help="Prints the result of parser to file.")
-parser.add_argument("-c", action='store_true', dest="command", default=False, help="Command to Query.")
+parser = argparse.ArgumentParser(description="Datalog bottom-up evaluation implement by Python, support Naive, Semi-Naive, Built-Ins, stratified and negation")
+parser.add_argument("-p", action='store_true', dest="verbose", default=False, help="Prints parser result to file.")
+parser.add_argument("-c", action='store_true', dest="command", default=False, help="Command to query.")
 
 subparsers = parser.add_subparsers(help='commands')
 
@@ -68,7 +68,7 @@ rules = []
 query = []
 
 def evaluationLog(l):
-    if not RELEASE or args.verbose:
+    if args.verbose:
         Parser.yacc.out.write(l)
 
 def logTime(step):
@@ -181,7 +181,7 @@ def checkProgramValidity(facts, rules, query):
             for s in [x.terms for x in rule.body if x.type == 'predicate']:
                 vList.extend(s)
             # log.debug("body variables {}".format(vList))
-            if isLowerCase(t):
+            if False:#isLowerCase(t):
                 rules.remove(rule)
                 evaluationLog("\nWarning! Header has variable\n{}\n".format(str(rule)))
                 log.warning("Warning! Header has variable")
@@ -470,6 +470,18 @@ def checkBodyNegative(predicate, key, body):
             return b.isNegated
     return False
 
+def checkUnifiable(key, value):
+    dict = {}
+    for i in range(0, len(key)):
+        if not key[i] in dict:
+            dict[key[i]] = set()
+        dict[key[i]].add(value[i])
+    for v in dict.values():
+        if not len(v) == 1:
+            return False
+    return True
+
+
 def bindingToVariable(binding, body):
     variable = {}
     # print(binding.values())
@@ -492,7 +504,8 @@ def bindingToVariable(binding, body):
             for i in range(0, len(key)): #(X, X)
                 listNew = []
                 for v in value[key]:
-                    listNew.append(v[i])
+                    if checkUnifiable(key, v):
+                        listNew.append(v[i])
                     # print(listNew)
                 list = listNew
                 if key[i] in variable.keys():
@@ -575,7 +588,7 @@ def mergeTwoDict(dict1, dict2):
     for key, value in dict1.items():
         if key in dict.keys():
             dict1[key] = value.union(dict[key])
-    if not checkIfDicSetValid(dict1):
+    if not checkIfDicSetUnifiable(dict1):
         log.trace("I should check first, not check after.")
         return
     return dict1
@@ -596,7 +609,7 @@ def getDicFromTuplesByTerm(key, value, builtInVariable, builtInBody):
     log.debug("generate new dictList {}".format(dictList))
     return dictList
 
-def checkIfDicSetValid(dict):
+def checkIfDicSetUnifiable(dict):
     for key, value in dict.items():
         # print("check valid value", value)
         if not len(value) == 1:
@@ -622,7 +635,7 @@ def filterDicByNewTermDic(dict, dictNew):
     log.trace("Check satisfy for each dictionary, if len(value) > 1, then remove it")
     list = filterList.copy()
     for f in list:
-        if not checkIfDicSetValid(f):
+        if not checkIfDicSetUnifiable(f):
             log.trace("I don't want to see some dict is out of the filter in mergeTwoDict process")
             filterList.remove(f)
     dict.clear()
@@ -664,11 +677,17 @@ def checkConstraint(dict, cons, verbose=True):
     if isLowerCase(cons.termX):
         x = cons.termX
     else:
-        x = list(dict[cons.termX])[0]
+        if isinstance(dict[cons.termX], set):
+            x = list(dict[cons.termX])[0]
+        else:
+            x = dict[cons.termX]
     if isLowerCase(cons.termY):
         y = cons.termY
     else:
-        y = list(dict[cons.termY])[0]
+        if isinstance(dict[cons.termY], set):
+            y = list(dict[cons.termY])[0]
+        else:
+            y = dict[cons.termY]
     if verbose:
         log.debug("x:{}, y:{}".format(x, y))
     if x and y:
@@ -792,17 +811,23 @@ if __name__ == '__main__':
     main(sys.argv)
     Parser.yacc.out.close()
     log.info("Total time: {} seconds".format(time.time()-start))
-    while True:
-        args.verbose = False
-        try:
-            s = input('query > ')
-        except EOFError:
-            break
-        if not s: continue
-        query = []
-        parser = Parser.yacc.parser
-        program = parser.parse(s)
-        for p in program:
-            if p.type == 'query':
-                query.append(p)
-        queryFromFacts(query, facts)
+    if args.command:
+        while True:
+            args.verbose = False
+            try:
+                s = input('query > ')
+                if s == 'q':
+                    break
+            except EOFError:
+                break
+            if not s: continue
+            query = []
+            Parser.yacc.errorList.clear()
+            parser = Parser.yacc.parser
+            program = parser.parse(s)
+            if not len(Parser.yacc.errorList) == 0:
+                continue
+            for p in program:
+                if p.type == 'query':
+                    query.append(p)
+            queryFromFacts(query, facts)
