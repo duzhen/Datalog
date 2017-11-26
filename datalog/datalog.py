@@ -167,35 +167,50 @@ def main(argv):
     cycle = list(nx.simple_cycles(G))
     if negated:
         # if not args.which == 'negation':
-        #     args.which = 'negation'
+        #     args.which = 'negation''
+        forceNaive = False
         log.t("Detect negation program, perform stratification evaluation")
+        if not len(cycle) == 0:
+            log.t("a positive cycle: {} in negation program".format(cycle))
+            for c in cycle:
+                if len(c) > 1:
+                    G.remove_edge(c[0], c[1])
+                    log.t("remove first edge, make it possible to running")
+                    if args.which == 'semi-naive':
+                        args.which = 'naive'
+                        print("force use naive evaluation to process a cycle EDG")
+                        forceNaive = True
         depends = nx.topological_sort(G)
         # depends2= nx.topological_sort(G2)
         dependsList = list(depends)
         # dependsList2 = list(depends2)
-        log.t('Topological sort of predicate: {}'.format(dependsList))
+        log.t('topological sort of predicate: {}'.format(dependsList))
         if len(dependsList) == 0:
             log.trace("No valid rule to do the evaluation")
             return
-        # reorder rules
-        tempRules = rules.copy()
+        forRules = rules.copy()
         stratumRules = []
-        for i in range(0, len(dependsList):
+        for i in range(0, len(dependsList)):
             predicate = dependsList[i]
-            while not len(tempRules):
-                rule = tempRules[0]
-                if predicate == rule.head.predicate and predicate in [x.predicate for x in rule.body if x.type == 'predicate'] or \
-                                        i < len(dependsList)-1 and dependsList[i+1] == rule.head.predicate and predicate in [x.predicate for x in rule.body if x.type == 'predicate']:
-                    stratumRules.append(tempRules.pop(0))
-                else:
-                    tempRules.append(tempRules.pop(0))
+            for j in range(0, len(dependsList)):
+                pnext = dependsList[j]
+                for rule in forRules:
+                    if pnext == rule.head.predicate \
+                            and predicate in [x.predicate for x in rule.body if x.type == 'predicate']:
+                        stratumRules.append(rule)
+                        forRules.remove(rule)
+                        break
+
         log.t("stratums is {}".format([x.head.predicate for x in stratumRules]))
         logTime("Parser and safety check")
         if not args.which == 'semi-naive':
             log.t("Perform naive evaluation method")
-            naive_engine(facts, tempRules)
+            if forceNaive:
+                naive_engine(facts, rules)
+            else:
+                naive_engine(facts, stratumRules)
         else:
-            engine(dependsList, facts, tempRules)
+            engine(dependsList, facts, stratumRules)
         logTime("Perform program evaluation")
     elif not len(cycle) == 0:
         if args.which == 'semi-naive':
@@ -207,7 +222,7 @@ def main(argv):
         # depends2= nx.topological_sort(G2)
         dependsList = list(depends)
         # dependsList2 = list(depends2)
-        log.t('Topological sort of predicate: {}'.format(dependsList))
+        log.t('topological sort of predicate: {}'.format(dependsList))
         if len(dependsList) == 0:
             log.trace("No valid rule to do the evaluation")
             return
@@ -468,7 +483,7 @@ def engine(dependsList, facts, rules):
                     logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
                     evaluateTimes += 1
                     if not newFacts:
-                        log.trace("Nothing get, return")
+                        log.t("Nothing get, return")
                         continue
                     log.t("Get {} new facts".format(len(newFacts)))
                     if not len(newFacts) == 0:
@@ -500,6 +515,7 @@ def engine(dependsList, facts, rules):
 # match all the goals in the rule
 def matchGoals(facts, rule, ruleIndex):
     # perform negation check first
+    negationList = []
     n_facts = facts.copy()
     for nb in rule.body:
         if nb.type == 'predicate' and nb.isNegated:
@@ -523,6 +539,7 @@ def matchGoals(facts, rule, ruleIndex):
                             if i == len(nb.terms)-1:
                                 if checkUnifiable(tuple(termsKey), termsValue):
                                     log.t("  drop fact {}".format(b_fact))
+                                    negationList.append({tuple(termsKey):termsValue})
                                     n_facts.remove(b_fact)
 
     binding = {}
@@ -536,7 +553,9 @@ def matchGoals(facts, rule, ruleIndex):
         # if body is negated:
         #     do some thing
         # else not negated
-        if body.type == 'predicate' and not body.isNegated:
+        if body.type == 'predicate':
+            if body.isNegated:
+                continue
             log.trace("Start match predicate {}".format(body))
 
             b_facts = getFactsByPredicate(n_facts, body.predicate, ruleIndex, b)
@@ -557,8 +576,8 @@ def matchGoals(facts, rule, ruleIndex):
                 return
             else:
                 for b_fact in b_facts:
-                    if args.optimize:
-                        b_fact.record.add("{}.{}".format(ruleIndex, b))
+                    # if args.optimize:
+                        # b_fact.record.add("{}.{}".format(ruleIndex, b))
                     if not unifyBinding(b_fact.fact, body, binding, facts):
                         continue
         if len(binding) == 0:
@@ -575,7 +594,7 @@ def matchGoals(facts, rule, ruleIndex):
         else:
             return []
     logTime("\t\tThe {} time perform local unify binding".format(evaluateTimes))
-    dict = globalUnify(binding, rule.body)
+    dict = globalUnify(binding, rule.body, negationList)
     logTime("\t\tThe {} time perform global unify binding".format(evaluateTimes))
     return matchHeader(rule, binding, facts, dict)
 
@@ -601,8 +620,8 @@ def filterBinding(binding, variable):
 #make a tuple match to a new match, like
 #('X', 'Y'): [['a', 'b'], ['a', 'c'], ['b', 'd'], ['c', 'd'], ['d', 'e']]
 # to {'X': {'c', 'a', 'd', 'b'}, 'Y': {'c', 'd', 'b', 'e'}}
-def globalUnify(binding, body):
-    variable = bindingToVariable(binding, body)
+def globalUnify(binding, body, negationList):
+    variable = bindingToVariable(binding, body, negationList)
     if args.optimize:
         filterBinding(binding, variable)
 
@@ -654,7 +673,7 @@ def checkUnifiable(key, value):
     return True
 
 
-def bindingToVariable(binding, body):
+def bindingToVariable(binding, body, negationList):
     log.t("get possible fact set {}".format(binding))
     log.t("local unification")
     variable = {}
@@ -676,7 +695,8 @@ def bindingToVariable(binding, body):
         for key, keyValue in value.items():
             localVariable = {}
             for v in value[key].copy():
-                if not checkUnifiable(key, v):
+                if {key:v} in negationList or not checkUnifiable(key, v):
+                    log.t("  drop tuple {}".format({key:v}))
                     value[key].remove(v)
             for i in range(0, len(key)): #(X, X)
                 listNew = []

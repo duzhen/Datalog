@@ -6,4 +6,4 @@ p(X, Y) :- not q(X, Y), s(X, Y).
 q(X, Y) :- q(X, Z), q(Z, Y).
 q(X, Y) :- d(X, Y), not r(X, Y).
 r(X, Y) :- d(Y, X).
-s(X, Y) :- not q(X, Z), q(Y, T), X != Y.
+s(X, Y) :- q(X, Z), q(Y, T), X != Y.
