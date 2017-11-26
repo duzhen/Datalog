@@ -47,7 +47,7 @@ optional arguments:
 *   python datalog/datalog.py -p naive program/demo/6-negation.cdl
 *   python datalog/datalog.py -p naive program/demo/6-2negation.cdl
 
-## 7-Performance/Others(trace,command query,)
+## 7-Performance/Others(trace,command query,optimization)
 *   python datalog/datalog.py -t naive program/demo/7-trace.cdl
 *   python datalog/datalog.py -p -x semi-naive program/demo/4-semi-naive.cdl
 *   python datalog/datalog.py -p -c naive program/demo/7-others.cdl

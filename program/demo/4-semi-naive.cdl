@@ -98,7 +98,7 @@ grandmother(Grandmother, Grandchild) :- grandparent(Grandmother, Grandchild), fe
 cousin(Me, Who) :- grandparent(Grandparent, Me), grandparent(Grandparent, Who), Me != Who.
 related(Me, Who) :- ancestor(Ancestor, Me), ancestor(Ancestor, Who).
 employed(Who) :- worksat(Who, Company).
-unemployed(Who) :- person(Who), not employed(Who), not retired(Who).
+%unemployed(Who) :- person(Who), not employed(Who), not retired(Who).
 
 % ========== Queries ==========
 

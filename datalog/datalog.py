@@ -24,6 +24,9 @@ naive_parser = subparsers.add_parser('naive', help='Bottom up evaluation with na
 naive_parser.set_defaults(which='naive')
 semi_parser = subparsers.add_parser('semi-naive', help='Bottom up evaluation with semi-naive method search')
 semi_parser.set_defaults(which='semi-naive')
+# negation_parser = subparsers.add_parser('negation', help='Stratification evaluation for Stratified Negation')
+# negation_parser.set_defaults(which='negation')
+
 parser.add_argument("file", help="Datalog program file")
 
 args = parser.parse_args()
@@ -163,31 +166,48 @@ def main(argv):
 
     cycle = list(nx.simple_cycles(G))
     if negated:
-        print("force use semi-naive evaluation to process negation")
+        # if not args.which == 'negation':
+        #     args.which = 'negation'
+        log.t("Detect negation program, perform stratification evaluation")
         depends = nx.topological_sort(G)
         # depends2= nx.topological_sort(G2)
         dependsList = list(depends)
         # dependsList2 = list(depends2)
-        log.trace('Topological sort: {}'.format(dependsList))
+        log.t('Topological sort of predicate: {}'.format(dependsList))
         if len(dependsList) == 0:
             log.trace("No valid rule to do the evaluation")
             return
-        # if len(dependsList2) != 0:
-        #     log.trace('cut the cycle graph, get topological sort: {}'.format(dependsList2))
-        # Naive part
-        # for each node in topological sort, implement of Extend dependency graph
+        # reorder rules
+        tempRules = rules.copy()
+        stratumRules = []
+        for i in range(0, len(dependsList):
+            predicate = dependsList[i]
+            while not len(tempRules):
+                rule = tempRules[0]
+                if predicate == rule.head.predicate and predicate in [x.predicate for x in rule.body if x.type == 'predicate'] or \
+                                        i < len(dependsList)-1 and dependsList[i+1] == rule.head.predicate and predicate in [x.predicate for x in rule.body if x.type == 'predicate']:
+                    stratumRules.append(tempRules.pop(0))
+                else:
+                    tempRules.append(tempRules.pop(0))
+        log.t("stratums is {}".format([x.head.predicate for x in stratumRules]))
         logTime("Parser and safety check")
-        engine(dependsList, facts, rules)
+        if not args.which == 'semi-naive':
+            log.t("Perform naive evaluation method")
+            naive_engine(facts, tempRules)
+        else:
+            engine(dependsList, facts, tempRules)
         logTime("Perform program evaluation")
     elif not len(cycle) == 0:
-        print("force use naive evaluation to process a cycle EDG")
+        if args.which == 'semi-naive':
+            args.which = 'naive'
+            print("force use naive evaluation to process a cycle EDG")
         naive_engine(facts, rules)
     else:
         depends = nx.topological_sort(G)
         # depends2= nx.topological_sort(G2)
         dependsList = list(depends)
         # dependsList2 = list(depends2)
-        log.trace('Topological sort: {}'.format(dependsList))
+        log.t('Topological sort of predicate: {}'.format(dependsList))
         if len(dependsList) == 0:
             log.trace("No valid rule to do the evaluation")
             return
@@ -377,7 +397,6 @@ def resetFacts():
         fact.record.clear()
 
 def naive_engine(facts, rules):
-    log.t("perform naive valuation")
     evaluateTimes = 1
     while True:
         newFacts = []
