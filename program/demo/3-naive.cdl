@@ -6,9 +6,12 @@ p(0).
 p(1).
 k(0).
 
+%positive cycle
 k(1) :- p(2).
 p(2) :- q(2).
 q(2) :- k(0).
+
+%path problem
 path(X,Y) :- edge(X,Z), edge(Z,Y).
 path(X,X) :- edge(X,X).
 
