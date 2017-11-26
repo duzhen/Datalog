@@ -150,8 +150,8 @@ def main(argv):
                 if body.predicate == r.head.predicate:
                     G.add_node(body.predicate)
                 else:
-                    if not G.has_edge(r.head.predicate, body.predicate):
-                        G.add_edge(body.predicate, r.head.predicate)
+                    # if not G.has_edge(r.head.predicate, body.predicate):
+                    G.add_edge(body.predicate, r.head.predicate)
     evaluationLog("\nQUERY:\n")
     for q in query:
         evaluationLog(str(q) + "\n")
@@ -172,14 +172,42 @@ def main(argv):
         log.t("Detect negation program, perform stratification evaluation")
         if not len(cycle) == 0:
             log.t("a positive cycle: {} in negation program".format(cycle))
+            naiveRules = []
+            for c in cycle:
+                if True:
+                    #perform naive for cycle, then continue rest
+                    # find cycle rules, perform rule
+                    for rule in rules:
+                        if rule.head.predicate in c and set([x.predicate for x in rule.body if x.type == 'predicate']) < set(c):
+                            naiveRules.append(rule)
+                    # log.t("perform naive first with these rules {}".format([x.head.predicate for x in naiveRules]))
+                    # naive_engine(facts, naiveRules)
+                    # for node in c.copy():
+                    #     print(G.edges(node))
+                    #     if len(G.edges(node)) > 1:
+                    #         c.remove(node)
+                    # G.remove_nodes_from(c)
+                else:
+                    if len(c) > 1:
+                        G.remove_edge(c[0], c[1])
+                        log.t("remove first edge, make it possible to running")
+                        if args.which == 'semi-naive':
+                            args.which = 'naive'
+                            print("force use naive evaluation to process a cycle EDG")
+                            forceNaive = True
+            log.t("perform naive first with these rules {}".format([x.head.predicate for x in naiveRules]))
+            naive_engine(facts, naiveRules)
             for c in cycle:
                 if len(c) > 1:
-                    G.remove_edge(c[0], c[1])
-                    log.t("remove first edge, make it possible to running")
-                    if args.which == 'semi-naive':
-                        args.which = 'naive'
-                        print("force use naive evaluation to process a cycle EDG")
-                        forceNaive = True
+                    # print("remove", c[0], c[1])
+                    if G.has_edge(c[0], c[1]):
+                        G.remove_edge(c[0], c[1])
+                # for node in c.copy():
+                #     print(G.edges(node))
+                #     if len(G.edges(node)) > 1:
+                #         c.remove(node)
+                # G.remove_nodes_from(c)
+
         depends = nx.topological_sort(G)
         # depends2= nx.topological_sort(G2)
         dependsList = list(depends)
