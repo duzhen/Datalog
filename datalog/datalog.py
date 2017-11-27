@@ -318,6 +318,8 @@ def semi_naive_recursion(EDB, incremental, rules, PATH):
     for i in range(0, len(rules)):
         # for rule in rules:
         rule = rules[i]
+        if len(set([x.predicate for x in rule.body if x.type == 'predicate']).intersection(set([x.fact.predicate for x in incremental]))) == 0:
+            continue
         log.trace("Inference rule {}".format(rule.head))
         # if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
         log.t("Inference rule {}".format(rule.head))
