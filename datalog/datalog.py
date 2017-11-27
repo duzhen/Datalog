@@ -90,6 +90,7 @@ log.addHandler(ch)
 facts = []
 rules = []
 query = []
+PATH = []
 
 def evaluationLog(l):
     if args.verbose:
@@ -162,6 +163,7 @@ def main(argv):
     if not len(cycle2) == 0:
         if not checkStratified(G2, cycle2):
             log.error("Datalog program do not satisfy the stratified safety")
+            evaluationLog("[ERROR] >> Datalog program do not satisfy the stratified safety")
             return
 
     cycle = list(nx.simple_cycles(G))
@@ -313,13 +315,19 @@ def EDB_int(EDB, rules):
     #     return
     return initEDB
 
-def semi_naive_recursion(EDB, incremental, rules, PATH):
+def semi_naive_recursion(EDB, incremental, rules):
+    originIncremental = incremental.copy()
     recursionFacts = []
+    incremental.extend(EDB)
     for i in range(0, len(rules)):
         # for rule in rules:
         rule = rules[i]
-        if len(set([x.predicate for x in rule.body if x.type == 'predicate']).intersection(set([x.fact.predicate for x in incremental]))) == 0:
+        # print([x.fact.predicate for x in originIncremental])
+        # print(set([x.predicate for x in rule.body if x.type == 'predicate']).intersection(set([x.fact.predicate for x in originIncremental])))
+        if len(set([x.predicate for x in rule.body if x.type == 'predicate']).intersection(set([x.fact.predicate for x in originIncremental]))) == 0:
+            # assert ()
             continue
+
         log.trace("Inference rule {}".format(rule.head))
         # if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
         log.t("Inference rule {}".format(rule.head))
@@ -356,15 +364,15 @@ def semi_naive_recursion(EDB, incremental, rules, PATH):
     #     evaluationLog("*{}\n".format(f))
     #     log.debug("******{}".format(f))
     PATH.extend(recursionFacts)
-    recursionFacts.extend(EDB)
-    semi_naive_recursion(EDB, recursionFacts, rules, PATH)
+    semi_naive_recursion(EDB, recursionFacts, rules)
 
 def semi_naive_engine(EDB, rules, query):
     incremental = EDB_int(EDB, rules)
-    PATH = incremental.copy()
-    incremental.extend(EDB)
+    PATH.extend(incremental)
+    # incremental.extend(EDB)
     # while not incremental:
-    semi_naive_recursion(EDB, incremental, rules, PATH)
+    for i in range(0, len(rules)):
+        semi_naive_recursion(EDB, incremental, rules)
 
 
 def checkProgramValidity(facts, rules, query):
@@ -534,7 +542,7 @@ def resetFacts():
 def naive_engine(facts, rules):
     evaluateTimes = 1
     while True:
-        newFacts = []
+        rulesFacts = []
         resetFacts()
         for i in range(0, len(rules)):
         # for rule in rules:
@@ -546,29 +554,30 @@ def naive_engine(facts, rules):
             logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
             evaluateTimes += 1
             if not newFacts:
-                log.trace("Nothing get, return")
+                # log.trace("Nothing get, return")
                 continue
-            log.t("Get {} new facts".format(len(newFacts)))
-            if not len(newFacts) == 0:
-                if args.which == 'semi-naive':
-                    log.t("semi-Naive restart evaluation")
-                    if TRACE:
-                        print("\t----------------------------------------------------------------")
-                else:
-                    log.t("Naive restart evaluation")
-                    if TRACE:
-                        print("\t----------------------------------------------------------------")
-                break
+            rulesFacts.extend(newFacts)
+        log.t("Get {} new facts".format(len(rulesFacts)))
+            # if not len(newFacts) == 0:
+            #     if args.which == 'semi-naive':
+            #         log.t("semi-Naive restart evaluation")
+            #         if TRACE:
+            #             print("\t----------------------------------------------------------------")
+            #     else:
+            #         log.t("Naive restart evaluation")
+            #         if TRACE:
+            #             print("\t----------------------------------------------------------------")
+            #     break
             # else:
             #     log.trace("Skip this rule, no predicate in this rule")
-        if not newFacts or len(newFacts) == 0:
+        if not rulesFacts or len(rulesFacts) == 0:
             log.t("No more new facts, return")
             break
         log.debug("New facts:")
-        for f in newFacts:
+        for f in rulesFacts:
             evaluationLog("*{}\n".format(f))
             log.debug("******{}".format(f))
-        facts.extend(newFacts)
+        facts.extend(rulesFacts)
     log.t("Achieved least fix-point, total {} facts.".format(len(facts)))
 
 
@@ -1044,6 +1053,9 @@ def evaluateBuiltInPredicate(dict, builtin, verbose=True):
 
 def checkFactExist(facts, fact):
     for fs in facts:
+        if fs.fact == fact.fact:
+            return True
+    for fs in PATH:
         if fs.fact == fact.fact:
             return True
     return False

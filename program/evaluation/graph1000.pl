@@ -1003,5 +1003,5 @@ edge(1000, 0).
 
 reachable(X,Y) :- edge(X,Y).
 reachable(X,Y) :- edge(X,Z), reachable(Z,Y).
-increasing(X,Y) :- edge(X,Y), lt(X,Y).
-increasing(X,Y) :- edge(X,Z), lt(X,Z), increasing(Z,Y).
+increasing(X,Y) :- edge(X,Y), X < Y.
+increasing(X,Y) :- edge(X,Z), X < Z, increasing(Z,Y).
