@@ -34,24 +34,21 @@ optional arguments:
 *   python datalog/datalog.py -p naive program/demo/2-safety.cdl
 
 ## 3-Naive&Semi-Naive Evaluation
-*   python datalog/datalog.py -p naive program/demo/3-linear.cdl
-*   python datalog/datalog.py -p naive program/demo/3-nonlinear.cdl
+*   python datalog/datalog.py -p semi-naive program/demo/3-linear.cdl
+*   python datalog/datalog.py -p semi-naive program/demo/3-nonlinear.cdl
     
 ## 4-Built-in
-*   python datalog/datalog.py -p naive program/demo/4-builtins.cdl
+*   python datalog/datalog.py -p semi-naive program/demo/4-builtins.cdl
 
 ## 5-Negation
-*   python datalog/datalog.py -p naive program/demo/6-stratification.cdl
+*   python datalog/datalog.py -p semi-naive program/demo/5-stratification.cdl
 
-## 6-Performance/Others(trace,command query,optimization)
-*   python datalog/datalog.py -t naive program/demo/6-trace.cdl
-*   python datalog/datalog.py -x semi-naive program/demo/6-optimization.cdl
-*   python datalog/datalog.py -p -c naive program/demo/6-optimization.cdl
+## 6-Trace(trace,command query)
+*   python datalog/datalog.py -t -c naive program/demo/6-trace.cdl
 
-*   same_clique(1,10)?
-*   same_clique(1,11)?
-*   same_clique(X, X)?
-*   same_clique(X, X), X==1?
+*   path(X, X)?
+*   path(0,2)?
+*   path(X, X), X==1?
 
 Reference:
 *   https://github.com/ghxiao/nrdatalog2sql
