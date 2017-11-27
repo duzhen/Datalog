@@ -248,14 +248,17 @@ def main(argv):
     #         print("force use naive evaluation to process a cycle EDG")
     #     naive_engine(facts, rules)
     else:
-        depends = nx.topological_sort(G)
-        # depends2= nx.topological_sort(G2)
-        dependsList = list(depends)
-        # dependsList2 = list(depends2)
-        log.t('topological sort of predicate: {}'.format(dependsList))
-        if len(dependsList) == 0:
-            log.trace("No valid rule to do the evaluation")
-            return
+        if len(cycle) == 0:
+            depends = nx.topological_sort(G)
+            # depends2= nx.topological_sort(G2)
+            dependsList = list(depends)
+            # dependsList2 = list(depends2)
+            log.t('topological sort of predicate: {}'.format(dependsList))
+            if len(dependsList) == 0:
+                log.trace("No valid rule to do the evaluation")
+                return
+            if args.optimize:
+                reOrderRules(dependsList, rules)
         # if len(dependsList2) != 0:
         #     log.trace('cut the cycle graph, get topological sort: {}'.format(dependsList2))
         #Naive part
@@ -277,6 +280,21 @@ def main(argv):
     log.trace("Perform query by the facts")
     queryFromFacts(query, facts)
     logTime("Perform query from fact")
+
+def reOrderRules(dependsList, rules):
+    forRules = rules.copy()
+    newRules = []
+    for i in range(0, len(dependsList)):
+        predicate = dependsList[i]
+        # for j in range(0, len(dependsList)):
+        #     pnext = dependsList[j]
+        for rule in forRules:
+            if predicate == rule.head.predicate:
+                newRules.append(rule)
+                forRules.remove(rule)
+    newRules.extend(forRules)
+    rules.clear()
+    rules.extend(newRules)
 
 def EDB_int(EDB, rules):
     initEDB = []
@@ -355,24 +373,26 @@ def semi_naive_recursion(EDB, incremental, rules):
         #     break
             # else:
             #     log.trace("Skip this rule, no predicate in this rule")
-
-    if len(recursionFacts) == 0:
-        log.t("No more new facts, return")
-        return
-    log.debug("New facts:")
-    # for f in newFacts:
-    #     evaluationLog("*{}\n".format(f))
-    #     log.debug("******{}".format(f))
-    PATH.extend(recursionFacts)
-    semi_naive_recursion(EDB, recursionFacts, rules)
+    return recursionFacts
 
 def semi_naive_engine(EDB, rules, query):
     incremental = EDB_int(EDB, rules)
     PATH.extend(incremental)
     # incremental.extend(EDB)
     # while not incremental:
-    for i in range(0, len(rules)):
-        semi_naive_recursion(EDB, incremental, rules)
+    # for i in range(0, len(rules)):
+    recursionFacts = semi_naive_recursion(EDB, incremental, rules)
+    if len(recursionFacts) == 0:
+        log.t("No more new facts, return")
+        return
+    # log.debug("New facts:")
+    # for f in newFacts:
+    #     evaluationLog("*{}\n".format(f))
+    #     log.debug("******{}".format(f))
+
+    while not len(recursionFacts) == 0:
+        PATH.extend(recursionFacts)
+        recursionFacts = semi_naive_recursion(EDB, recursionFacts, rules)
 
 
 def checkProgramValidity(facts, rules, query):
@@ -673,7 +693,61 @@ def matchGoals(facts, rule, ruleIndex):
 
     binding = {}
     #for each goal in body
-    for b in range(0, len(rule.body)):
+    semiDict = []
+    restBody = rule.body.copy()
+    if args.which == 'semi-naive':
+        restBody.clear()
+        #check if linear
+        nonLinearBody = {}
+        tempBody = rule.body.copy()
+        while not len(tempBody) == 0:
+            body = tempBody[0]
+            if body.type == 'predicate' and not body.isNegated:
+                b = [x for x in rule.body if x.type == 'predicate' and x.predicate == body.predicate]
+                if len(b) == 2:
+                    for bb in b:
+                        tempBody.remove(bb)
+                    nonLinearBody[body.predicate] = b
+                else:
+                    restBody.append(body)
+                    tempBody.remove(body)
+            else:
+                restBody.append(body)
+                tempBody.remove(body)
+        # print(len(nonLinearBody))
+
+        for key, value in nonLinearBody.items():
+            incremental_facts = getFactsByPredicate(facts, key)
+            path_facts = getFactsByPredicate(PATH, key)
+            #new new
+            for b_fact in incremental_facts:
+                if not unifyBinding(b_fact.fact, value[0], binding):
+                    continue
+            for b_fact in incremental_facts:
+                if not unifyBinding(b_fact.fact, value[1], binding):
+                    continue
+            semiDict.extend(globalUnify(binding, rule.body, negationList))
+            #new old
+            for b_fact in incremental_facts:
+                if not unifyBinding(b_fact.fact, value[0], binding):
+                    continue
+            for b_fact in path_facts:
+                if not unifyBinding(b_fact.fact, value[1], binding):
+                    continue
+            semiDict.extend(globalUnify(binding, rule.body, negationList))
+            #old new
+            for b_fact in path_facts:
+                if not unifyBinding(b_fact.fact, value[0], binding):
+                    continue
+            for b_fact in incremental_facts:
+                if not unifyBinding(b_fact.fact, value[1], binding):
+                    continue
+            semiDict.extend(globalUnify(binding, rule.body, negationList))
+        if len(restBody) == 0 and not len(semiDict) == 0:
+            return matchHeader(rule, binding, facts, semiDict)
+
+
+    for b in range(0, len(restBody)):
         body = rule.body[b]
     # for body in rule.body:
         # print(body)
@@ -707,7 +781,7 @@ def matchGoals(facts, rule, ruleIndex):
                 for b_fact in b_facts:
                     # if args.optimize:
                         # b_fact.record.add("{}.{}".format(ruleIndex, b))
-                    if not unifyBinding(b_fact.fact, body, binding, facts):
+                    if not unifyBinding(b_fact.fact, body, binding):
                         continue
         if len(binding) == 0:
             log.debug("At least one body cannot unify from all the facts")
@@ -724,6 +798,7 @@ def matchGoals(facts, rule, ruleIndex):
             return []
     logTime("\t\tThe {} time perform local unify binding".format(evaluateTimes))
     dict = globalUnify(binding, rule.body, negationList)
+    dict.extend(semiDict)
     logTime("\t\tThe {} time perform global unify binding".format(evaluateTimes))
     return matchHeader(rule, binding, facts, dict)
 
@@ -1063,7 +1138,7 @@ def checkFactExist(facts, fact):
 
 # get variable tuple for each goal
 # p1: fact, p2:body
-def unifyBinding(p1, p2, binding, facts):
+def unifyBinding(p1, p2, binding):
     global evaluateTimes
     if len(p1.terms) == len(p2.terms):
         # keys = (x for x in p1.terms)

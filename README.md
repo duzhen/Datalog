@@ -33,24 +33,20 @@ optional arguments:
 ## 2-Safety Check
 *   python datalog/datalog.py -p naive program/demo/2-safety.cdl
 
-## 3-Naive Evaluation
-*   python datalog/datalog.py -p naive program/demo/3-naive.cdl
-*   python datalog/datalog.py -p naive program/demo/3-2naive.cdl
+## 3-Naive&Semi-Naive Evaluation
+*   python datalog/datalog.py -p naive program/demo/3-linear.cdl
+*   python datalog/datalog.py -p naive program/demo/3-nonlinear.cdl
     
-## 4-Semi-Naive
-*   python datalog/datalog.py -p semi-naive program/demo/4-semi-naive.cdl
+## 4-Built-in
+*   python datalog/datalog.py -p naive program/demo/4-builtins.cdl
 
-## 5-Built-in
-*   python datalog/datalog.py -p naive program/demo/5-builtins.cdl
+## 5-Negation
+*   python datalog/datalog.py -p naive program/demo/6-stratification.cdl
 
-## 6-Negation
-*   python datalog/datalog.py -p naive program/demo/6-negation.cdl
-*   python datalog/datalog.py -p naive program/demo/6-2negation.cdl
-
-## 7-Performance/Others(trace,command query,optimization)
-*   python datalog/datalog.py -t naive program/demo/7-trace.cdl
-*   python datalog/datalog.py -p -x semi-naive program/demo/4-semi-naive.cdl
-*   python datalog/datalog.py -p -c naive program/demo/7-others.cdl
+## 6-Performance/Others(trace,command query,optimization)
+*   python datalog/datalog.py -t naive program/demo/6-trace.cdl
+*   python datalog/datalog.py -x semi-naive program/demo/6-optimization.cdl
+*   python datalog/datalog.py -p -c naive program/demo/6-optimization.cdl
 
 *   same_clique(1,10)?
 *   same_clique(1,11)?
