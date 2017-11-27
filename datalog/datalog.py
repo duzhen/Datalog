@@ -240,11 +240,11 @@ def main(argv):
         else:
             engine(dependsList, facts, stratumRules)
         logTime("Perform program evaluation")
-    elif not len(cycle) == 0:
-        if args.which == 'semi-naive':
-            args.which = 'naive'
-            print("force use naive evaluation to process a cycle EDG")
-        naive_engine(facts, rules)
+    # elif not len(cycle) == 0:
+    #     if args.which == 'semi-naive':
+    #         args.which = 'naive'
+    #         print("force use naive evaluation to process a cycle EDG")
+    #     naive_engine(facts, rules)
     else:
         depends = nx.topological_sort(G)
         # depends2= nx.topological_sort(G2)
@@ -263,7 +263,8 @@ def main(argv):
             log.t("Perform naive evaluation method")
             naive_engine(facts, rules)
         else:
-            engine(dependsList, facts, rules)
+            semi_naive_engine(facts, rules, query)
+            # engine(dependsList, facts, rules)
         logTime("Perform program evaluation")
         if not args.which == 'semi-naive':
             log.debug("Finish Naive evaluation method")
@@ -274,6 +275,95 @@ def main(argv):
     log.trace("Perform query by the facts")
     queryFromFacts(query, facts)
     logTime("Perform query from fact")
+
+def EDB_int(EDB, rules):
+    initEDB = []
+    for i in range(0, len(rules)):
+        # for rule in rules:
+        rule = rules[i]
+        log.trace("Inference rule {}".format(rule.head))
+        # if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
+        log.t("Inference rule {}".format(rule.head))
+        newFacts = matchGoals(EDB, rule, i)
+        logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
+        # evaluateTimes += 1
+        if not newFacts:
+            log.trace("Nothing get, return")
+            continue
+        log.t("Get {} new facts".format(len(newFacts)))
+        if newFacts:
+            for f in newFacts:
+                evaluationLog("*{}\n".format(f))
+                log.debug("******{}".format(f))
+            initEDB.extend(newFacts)
+        # if not len(newFacts) == 0:
+        #     if args.which == 'semi-naive':
+        #         log.t("semi-Naive restart evaluation")
+        #         if TRACE:
+        #             print("\t----------------------------------------------------------------")
+        #     else:
+        #         log.t("Naive restart evaluation")
+        #         if TRACE:
+        #             print("\t----------------------------------------------------------------")
+        #     continue
+            # else:
+            #     log.trace("Skip this rule, no predicate in this rule")
+    # if not initEDB or len(initEDB) == 0:
+    #     log.t("No more new facts, return")
+    #     return
+    return initEDB
+
+def semi_naive_recursion(EDB, incremental, rules, PATH):
+    recursionFacts = []
+    for i in range(0, len(rules)):
+        # for rule in rules:
+        rule = rules[i]
+        log.trace("Inference rule {}".format(rule.head))
+        # if depend in [x.predicate for x in rule.body if x.type == 'predicate']:
+        log.t("Inference rule {}".format(rule.head))
+        newFacts = matchGoals(incremental, rule, i)
+        logTime("\tTotal {} time perform evaluation".format(evaluateTimes))
+        # evaluateTimes += 1
+        if not newFacts:
+            log.trace("Nothing get, return")
+            continue
+        log.t("Get {} new facts".format(len(newFacts)))
+        if newFacts:
+            for f in newFacts:
+                evaluationLog("*{}\n".format(f))
+                log.debug("******{}".format(f))
+            recursionFacts.extend(newFacts)
+        # if not len(newFacts) == 0:
+        #     if args.which == 'semi-naive':
+        #         log.t("semi-Naive restart evaluation")
+        #         if TRACE:
+        #             print("\t----------------------------------------------------------------")
+        #     else:
+        #         log.t("Naive restart evaluation")
+        #         if TRACE:
+        #             print("\t----------------------------------------------------------------")
+        #     break
+            # else:
+            #     log.trace("Skip this rule, no predicate in this rule")
+
+    if len(recursionFacts) == 0:
+        log.t("No more new facts, return")
+        return
+    log.debug("New facts:")
+    # for f in newFacts:
+    #     evaluationLog("*{}\n".format(f))
+    #     log.debug("******{}".format(f))
+    PATH.extend(recursionFacts)
+    recursionFacts.extend(EDB)
+    semi_naive_recursion(EDB, recursionFacts, rules, PATH)
+
+def semi_naive_engine(EDB, rules, query):
+    incremental = EDB_int(EDB, rules)
+    PATH = incremental.copy()
+    incremental.extend(EDB)
+    # while not incremental:
+    semi_naive_recursion(EDB, incremental, rules, PATH)
+
 
 def checkProgramValidity(facts, rules, query):
     warning = False
