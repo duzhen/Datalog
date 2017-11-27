@@ -7,7 +7,7 @@ edge(X, e).
 edge(a, a).
 edge(b, b).
 
-path(X, Y) :- edge(X, Y), not edge(X, X), not edge(Y, Y).
+path(X, Y) :- edge(X, X), not edge(X, X), not edge(Y, Y).
 path(X, Y) :- path(X, Z), path(Z, Y).
 
 %!!Warning!!

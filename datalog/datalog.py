@@ -426,6 +426,23 @@ def checkProgramValidity(facts, rules, query):
                 break
         if remove:
             continue
+        bList = []
+        nList = []
+        for s in [x.terms for x in rule.body if x.type == 'predicate' and not x.isNegated]:
+            bList.extend(s)
+        for s in [x.terms for x in rule.body if x.type == 'predicate' and x.isNegated]:
+            nList.extend(s)
+        remove = False
+        for p in nList:
+            if not p in bList:
+                rules.remove(rule)
+                evaluationLog("\nWarning! Negation is not safety\n{}\n".format(str(rule)))
+                log.warning("Warning! Negation is not safety")
+                warning = True
+                remove = True
+                break
+        if remove:
+            continue
         if isLowerCaseList(rule.head.terms):
             break
         for t in rule.head.terms:
