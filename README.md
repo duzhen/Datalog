@@ -38,16 +38,16 @@ optional arguments:
 *   python datalog/datalog.py -p semi-naive program/demo/3-nonlinear.cdl
     
 ## 4-Built-in
-*   python datalog/datalog.py -p semi-naive program/demo/4-builtins.cdl
+*   python datalog/datalog.py -p naive program/demo/4-builtins.cdl
 
 ## 5-Negation
-*   python datalog/datalog.py -p semi-naive program/demo/5-stratification.cdl
+*   python datalog/datalog.py -p naive program/demo/5-stratification.cdl
 
 ## 6-Trace(trace,command query)
 *   python datalog/datalog.py -t -c naive program/demo/6-trace.cdl
 
 *   path(X, X)?
-*   path(0,2)?
+*   path(0, 2)?
 *   path(X, X), X==1?
 
 Reference:

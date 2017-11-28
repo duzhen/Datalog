@@ -278,7 +278,10 @@ def main(argv):
         log.trace(f)
 
     log.trace("Perform query by the facts")
-    queryFromFacts(query, facts)
+    if args.which == 'semi-naive':
+        queryFromFacts(query, PATH)
+    else:
+        queryFromFacts(query, facts)
     logTime("Perform query from fact")
 
 def reOrderRules(dependsList, rules):
@@ -1255,4 +1258,7 @@ if __name__ == '__main__':
             for p in program:
                 if p.type == 'query':
                     query.append(p)
-            queryFromFacts(query, facts)
+            if args.which == 'semi-naive':
+                queryFromFacts(query, PATH)
+            else:
+                queryFromFacts(query, facts)
